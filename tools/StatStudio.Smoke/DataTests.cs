@@ -73,6 +73,10 @@ internal static class DataTests
         Check.Close(Calculator.Evaluate("(C1 + C2) / 2", cw2)[0], 5.5, "parentheses + divide");
         Check.Close(Calculator.Evaluate("-C1 + 5", cw2)[0], 4, "unary minus");
         Check.Close(Calculator.Evaluate("'Sq' / C1", cw2)[2], 3, "quoted column name");
+        Check.Close(Calculator.Evaluate("-2^2", cw2)[0], -4, "unary minus looser than ^ : -(2^2)");
+        Check.Close(Calculator.Evaluate("2^-2", cw2)[0], 0.25, "negative exponent");
+        Check.Close(Calculator.Evaluate("2 * -3", cw2)[0], -6, "unary minus after operator");
+        Check.Close(Calculator.Evaluate("2^3^2", cw2)[0], 512, "power is right-associative");
 
         Check.Section("Project (.ssproj) round-trip");
         var proj = Path.Combine(Path.GetTempPath(), "statstudio_smoke.ssproj");

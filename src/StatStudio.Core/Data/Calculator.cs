@@ -82,30 +82,29 @@ public static class Calculator
 
         private Func<int, double> ParseTerm()
         {
-            var left = ParsePower();
+            var left = ParseUnary();
             while (true)
             {
-                SkipWs();
                 char c = Peek();
-                if (c == '*' || c == '/') { _pos++; var right = ParsePower(); var l = left; var op = c; left = r => op == '*' ? l(r) * right(r) : l(r) / right(r); }
+                if (c == '*' || c == '/') { _pos++; var right = ParseUnary(); var l = left; var op = c; left = r => op == '*' ? l(r) * right(r) : l(r) / right(r); }
                 else return left;
             }
         }
 
-        private Func<int, double> ParsePower()
-        {
-            var b = ParseUnary();
-            SkipWs();
-            if (Peek() == '^') { _pos++; var e = ParsePower(); return r => Math.Pow(b(r), e(r)); }
-            return b;
-        }
-
+        // Unary minus binds looser than ^, so -x^2 = -(x^2) (mathematical convention).
         private Func<int, double> ParseUnary()
         {
-            SkipWs();
-            if (Peek() == '-') { _pos++; var o = ParseUnary(); return r => -o(r); }
-            if (Peek() == '+') { _pos++; return ParseUnary(); }
-            return ParseAtom();
+            char c = Peek();
+            if (c == '-') { _pos++; var o = ParseUnary(); return r => -o(r); }
+            if (c == '+') { _pos++; return ParseUnary(); }
+            return ParsePower();
+        }
+
+        private Func<int, double> ParsePower()
+        {
+            var b = ParseAtom();
+            if (Peek() == '^') { _pos++; var e = ParseUnary(); return r => Math.Pow(b(r), e(r)); }  // right-assoc; exponent may be unary
+            return b;
         }
 
         private Func<int, double> ParseAtom()
