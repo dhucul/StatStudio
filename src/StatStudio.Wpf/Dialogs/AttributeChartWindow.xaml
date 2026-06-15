@@ -1,0 +1,33 @@
+<Window x:Class="StatStudio.Wpf.Dialogs.AttributeChartWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Attribute Chart" Height="240" Width="360"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="CountsLabel" Text="Counts column:" VerticalAlignment="Center" Margin="0,0,10,8"/>
+        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CountsCombo" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" x:Name="SizesLabel" Text="Sample sizes column:" VerticalAlignment="Center" Margin="0,0,10,8"/>
+        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="SizesCombo" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="ConstLabel" Text="Sample size (n):" VerticalAlignment="Center" Margin="0,0,10,8"/>
+        <TextBox Grid.Row="2" Grid.Column="1" x:Name="ConstBox" Margin="0,0,0,8"/>
+
+        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" Width="80" Click="OnOk" IsDefault="True"/>
+            <Button Content="Cancel" Width="80" Margin="6,0,0,0" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,51 @@
+<Window x:Class="StatStudio.Wpf.Dialogs.ProportionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Proportion Test" Height="330" Width="360"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="4" x:Name="Prompt" Foreground="#9CDCFE"
+                   Margin="0,0,0,10" Text="Enter summarized counts."/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Sample 1  Events:" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox Grid.Row="1" Grid.Column="1" x:Name="X1" Margin="0,0,8,8"/>
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="Trials:" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox Grid.Row="1" Grid.Column="3" x:Name="N1" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="Lbl2" Text="Sample 2  Events:" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox Grid.Row="2" Grid.Column="1" x:Name="X2" Margin="0,0,8,8"/>
+        <TextBlock Grid.Row="2" Grid.Column="2" x:Name="Lbl2b" Text="Trials:" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox Grid.Row="2" Grid.Column="3" x:Name="N2" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" x:Name="P0Label" Text="Hypothesized p:" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox Grid.Row="3" Grid.Column="1" x:Name="P0Box" Text="0.5" Margin="0,0,8,8"/>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Alternative:" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <ComboBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" x:Name="AltCombo" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="5" Grid.Column="0" Text="Confidence (%):" VerticalAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox Grid.Row="5" Grid.Column="1" x:Name="ConfBox" Text="95" Margin="0,0,0,8"/>
+
+        <StackPanel Grid.Row="7" Grid.ColumnSpan="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" Width="80" Click="OnOk" IsDefault="True"/>
+            <Button Content="Cancel" Width="80" Margin="6,0,0,0" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

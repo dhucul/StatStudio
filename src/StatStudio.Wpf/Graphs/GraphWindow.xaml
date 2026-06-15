@@ -1,0 +1,10 @@
+<Window x:Class="StatStudio.Wpf.Graphs.GraphWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sp="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
+        Title="Graph" Height="560" Width="780"
+        WindowStartupLocation="CenterOwner" Background="#1E1E1E">
+    <Grid>
+        <sp:WpfPlot x:Name="PlotView"/>
+    </Grid>
+</Window>

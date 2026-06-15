@@ -1,0 +1,41 @@
+<Window x:Class="StatStudio.Wpf.Dialogs.TwoColumnWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Two-Column Test" Height="300" Width="360"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Sample 1:" VerticalAlignment="Center" Margin="0,0,10,8"/>
+        <ComboBox Grid.Row="0" Grid.Column="1" x:Name="Combo1" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Sample 2:" VerticalAlignment="Center" Margin="0,0,10,8"/>
+        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="Combo2" Margin="0,0,0,8"/>
+
+        <CheckBox Grid.Row="2" Grid.ColumnSpan="2" x:Name="PooledBox"
+                  Content="Assume equal variances (pooled)" Margin="0,4,0,8"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Alternative:" VerticalAlignment="Center" Margin="0,0,10,8"/>
+        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="AltCombo" Margin="0,0,0,8"/>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" Text="Confidence (%):" VerticalAlignment="Center" Margin="0,0,10,8"/>
+        <TextBox Grid.Row="4" Grid.Column="1" x:Name="ConfBox" Text="95" Margin="0,0,0,8"/>
+
+        <StackPanel Grid.Row="6" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" Width="80" Click="OnOk" IsDefault="True"/>
+            <Button Content="Cancel" Width="80" Margin="6,0,0,0" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

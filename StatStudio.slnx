@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StatStudio.Core/StatStudio.Core.csproj" />
+    <Project Path="src/StatStudio.Wpf/StatStudio.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/StatStudio.Smoke/StatStudio.Smoke.csproj" />
+  </Folder>
+</Solution>
