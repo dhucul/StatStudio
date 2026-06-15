@@ -57,6 +57,23 @@ internal static class DataTests
         Check.Equal(xback.Columns[1][0]!, "p", "xlsx text value");
         File.Delete(xlsx);
 
+        Check.Section("Worksheet calculator");
+        var cw2 = new Worksheet();
+        var c1 = cw2.AddColumn("C1"); foreach (var v in new[] { "1", "2", "3" }) c1.Add(v);
+        var c2 = cw2.AddColumn("C2"); foreach (var v in new[] { "10", "20", "30" }) c2.Add(v);
+        var c3 = cw2.AddColumn("Sq"); foreach (var v in new[] { "1", "4", "9" }) c3.Add(v);
+
+        Check.Close(Calculator.Evaluate("C1 + C2", cw2)[1], 22, "C1+C2 row 2");
+        Check.Close(Calculator.Evaluate("C1 * 2 + 1", cw2)[2], 7, "C1*2+1 row 3");
+        Check.Close(Calculator.Evaluate("C1 ^ 2", cw2)[2], 9, "C1^2 row 3");
+        Check.Close(Calculator.Evaluate("SQRT(Sq)", cw2)[2], 3, "SQRT(Sq) row 3");
+        Check.Close(Calculator.Evaluate("1 + 2 * 3", cw2)[0], 7, "operator precedence");
+        Check.Close(Calculator.Evaluate("MEAN(C1)", cw2)[0], 2, "MEAN(C1) broadcast");
+        Check.Close(Calculator.Evaluate("LOG(EXP(C1))", cw2)[1], 2, "LOG(EXP(C1)) row 2");
+        Check.Close(Calculator.Evaluate("(C1 + C2) / 2", cw2)[0], 5.5, "parentheses + divide");
+        Check.Close(Calculator.Evaluate("-C1 + 5", cw2)[0], 4, "unary minus");
+        Check.Close(Calculator.Evaluate("'Sq' / C1", cw2)[2], 3, "quoted column name");
+
         Check.Section("Project (.ssproj) round-trip");
         var proj = Path.Combine(Path.GetTempPath(), "statstudio_smoke.ssproj");
         ProjectStore.Save(xw, proj);

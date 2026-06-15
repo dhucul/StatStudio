@@ -73,6 +73,28 @@ internal static class DoeTests
         Check.Close(RT("B*B").Coef, 0.5, "square B");
         Check.Close(RT("A*B").Coef, 1.5, "interaction A*B");
 
+        Check.Section("Mixture — simplex designs");
+        var cen = MixtureDesign.SimplexCentroid(3, randomize: false);
+        Check.Equal(cen.Runs, 7, "simplex-centroid(3) = 2^3 - 1 runs");
+        Check.True(cen.RunList.All(r => Math.Abs(r.Components.Sum() - 1.0) < 1e-9), "components sum to 1");
+        var lat = MixtureDesign.SimplexLattice(3, 2, randomize: false);
+        Check.Equal(lat.Runs, 6, "simplex-lattice {3,2} = 6 runs");
+        Check.True(lat.RunList.All(r => Math.Abs(r.Components.Sum() - 1.0) < 1e-9), "lattice sums to 1");
+
+        Check.Section("Mixture — Scheffé model recovery");
+        var ma = cen.RunList.Select(r => r.Components[0]).ToArray();
+        var mb = cen.RunList.Select(r => r.Components[1]).ToArray();
+        var mc = cen.RunList.Select(r => r.Components[2]).ToArray();
+        var my = new double[ma.Length];
+        for (int i = 0; i < my.Length; i++) my[i] = 2 * ma[i] + 3 * mb[i] + 5 * mc[i] + 4 * ma[i] * mb[i];
+        var mfit = MixtureAnalysis.Fit(my, new[] { ma, mb, mc }, new[] { "A", "B", "C" }, quadratic: true);
+        RegressionTerm MT(string n) => mfit.Terms.First(t => t.Name == n);
+        Check.Close(MT("A").Coef, 2, "beta A");
+        Check.Close(MT("B").Coef, 3, "beta B");
+        Check.Close(MT("C").Coef, 5, "beta C");
+        Check.Close(MT("A*B").Coef, 4, "beta A*B");
+        Check.Close(MT("A*C").Coef, 0, "beta A*C ~ 0", 1e-6);
+
         Check.Section("Gage R&R (2 parts × 2 operators × 2 reps)");
         var meas = new double[] { 10, 12, 11, 13, 20, 22, 21, 23 };
         var parts = new[] { "P1", "P1", "P1", "P1", "P2", "P2", "P2", "P2" };

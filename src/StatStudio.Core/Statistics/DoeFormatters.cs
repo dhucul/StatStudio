@@ -23,6 +23,24 @@ public static class DoeFormatters
                "Estimated Effects and Coefficients (coded units)\n" + t + "\n\n" + model + note;
     }
 
+    public static string Mixture(MixtureDesignResult d) =>
+        $"Created {d.Type} mixture design: {d.Components} components, {d.Runs} runs.\n" +
+        $"Components {string.Join(", ", d.ComponentNames)} written to the worksheet (each row's proportions sum to 1).";
+
+    public static string MixtureModel(MixtureResult r)
+    {
+        var t = new TextTable("Term", "Coef", "SE Coef", "T-Value", "P-Value").LeftAlign(0);
+        foreach (var term in r.Terms)
+            t.Add(term.Name, Fmt.N(term.Coef, 4),
+                double.IsNaN(term.SeCoef) ? "" : Fmt.N(term.SeCoef, 4),
+                double.IsNaN(term.T) ? "" : Fmt.N(term.T, 2),
+                double.IsNaN(term.P) ? "" : Fmt.P(term.P));
+        var model = new TextTable("S", "R-sq", "R-sq(adj)");
+        model.Add(Fmt.N(r.S, 4), $"{r.RSquared * 100:0.00}%", $"{r.RSquaredAdj * 100:0.00}%");
+        return $"Mixture Regression: {r.Response} ({(r.Quadratic ? "quadratic" : "linear")} Scheffé model, no intercept)\n\n" +
+               "Estimated Coefficients (component proportions)\n" + t + "\n\n" + "Model Summary\n" + model;
+    }
+
     public static string Fractional(FractionalDesign d)
     {
         int pp = d.Factors - (int)Math.Round(Math.Log2(d.Runs));

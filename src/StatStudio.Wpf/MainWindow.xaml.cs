@@ -61,6 +61,16 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-calc":
+                    BuildDemo();
+                    var cwx = CurrentWorksheet();
+                    var calc = CoreData.Calculator.Evaluate("Height + Weight", cwx);
+                    var newCol = cwx.AddColumn("Total");
+                    foreach (var cval in calc) newCol.Add(cval.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+                    LoadWorksheet(cwx);
+                    Log("Calculated 'Total' = Height + Weight.");
+                    Log("Also: MEAN(Height) = " + CoreData.Calculator.Evaluate("MEAN(Height)", cwx)[0].ToString("0.###"));
+                    break;
                 case "--shot-reliability":
                     int rn = 30;
                     var wt = new double[rn];
@@ -829,6 +839,65 @@ public partial class MainWindow : Window
         }
         LoadWorksheet(ws);
         Log(DoeFormatters.Fractional(design));
+    }
+
+    private void OnCalculator(object sender, RoutedEventArgs e)
+    {
+        var dlg = new CalculatorWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var ws = CurrentWorksheet();
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        try
+        {
+            var result = CoreData.Calculator.Evaluate(dlg.Expression, ws);
+            var col = ws.Find(dlg.TargetColumn) ?? ws.AddColumn(dlg.TargetColumn);
+            col.Clear();
+            foreach (var v in result) col.Add(double.IsNaN(v) ? null : v.ToString("0.##########", inv));
+            LoadWorksheet(ws);
+            Log($"Calculated '{dlg.TargetColumn}' = {dlg.Expression}  ({result.Length} rows).");
+        }
+        catch (Exception ex) { ShowError("Calculator", ex); }
+    }
+
+    private void OnCreateMixture(object sender, RoutedEventArgs e)
+    {
+        var dlg = new MixtureCreateWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var design = dlg.IsLattice
+            ? MixtureDesign.SimplexLattice(dlg.Components, dlg.Degree, dlg.Randomize)
+            : MixtureDesign.SimplexCentroid(dlg.Components, dlg.Randomize);
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+
+        var ws = new CoreData.Worksheet { Name = $"Mixture_{dlg.Components}c" };
+        var so = ws.AddColumn("StdOrder");
+        var ro = ws.AddColumn("RunOrder");
+        var pt = ws.AddColumn("PtType", CoreData.ColumnType.Text);
+        var ccols = design.ComponentNames.Select(n => ws.AddColumn(n)).ToList();
+        foreach (var run in design.RunList)
+        {
+            so.Add(run.StdOrder.ToString());
+            ro.Add(run.RunOrder.ToString());
+            pt.Add(run.PointType);
+            for (int j = 0; j < ccols.Count; j++) ccols[j].Add(run.Components[j].ToString("0.#####", inv));
+        }
+        LoadWorksheet(ws);
+        Log(DoeFormatters.Mixture(design));
+    }
+
+    private void OnAnalyzeMixture(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Analyze Mixture Design (response, then components)" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, comps) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (comps.Length < 2) { Log("Select at least two components."); return; }
+        try
+        {
+            var r = MixtureAnalysis.Fit(y, comps, dlg.Predictors, quadratic: true);
+            OutputRaw(DoeFormatters.MixtureModel(r));
+        }
+        catch (Exception ex) { Log($"Mixture analysis: {ex.Message}"); }
     }
 
     private void OnCreateRsm(object sender, RoutedEventArgs e)

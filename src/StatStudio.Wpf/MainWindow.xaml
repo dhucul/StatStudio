@@ -15,6 +15,9 @@
                 <Separator/>
                 <MenuItem Header="E_xit" Click="OnExit"/>
             </MenuItem>
+            <MenuItem Header="C_alc">
+                <MenuItem Header="_Calculator…" Click="OnCalculator"/>
+            </MenuItem>
             <MenuItem Header="_Stat" x:Name="StatMenu">
                 <MenuItem Header="_Basic Statistics">
                     <MenuItem Header="_Display Descriptive Statistics…" Click="OnDescriptives"/>
@@ -89,6 +92,9 @@
                     <Separator/>
                     <MenuItem Header="Create _Response Surface…" Click="OnCreateRsm"/>
                     <MenuItem Header="Analy_ze Response Surface…" Click="OnAnalyzeRsm"/>
+                    <Separator/>
+                    <MenuItem Header="Create _Mixture Design…" Click="OnCreateMixture"/>
+                    <MenuItem Header="Analyze _Mixture Design…" Click="OnAnalyzeMixture"/>
                 </MenuItem>
                 <MenuItem Header="Po_wer and Sample Size…" Click="OnPowerSampleSize"/>
                 <MenuItem Header="_Control Charts">

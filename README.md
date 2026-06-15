@@ -22,10 +22,12 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
   k-means clustering.
 - **Reliability / survival** — parametric life-data fitting (Weibull/exponential/lognormal/normal
   MLE with percentiles + Weibull probability plot) and Kaplan-Meier survival (right-censoring).
-- **DOE** — create full 2^k and 2^(k-p) fractional factorial designs (generators, resolution,
-  defining relation, replicates, center points, randomized run order) and **response-surface
-  designs** (central composite + Box-Behnken); analyze 2-level factorials (effects, ANOVA,
-  Pareto) and second-order response surfaces (full quadratic model).
+- **DOE** — create full 2^k / 2^(k-p) fractional factorial designs (generators, resolution,
+  defining relation), **response-surface** designs (central composite + Box-Behnken), and
+  **mixture** designs (simplex-lattice + simplex-centroid); analyze 2-level factorials
+  (effects, Pareto), second-order response surfaces, and Scheffé mixture models.
+- **Calculator** — compute a new column from a formula: `Cn`/named columns, `+ - * / ^`,
+  per-row functions (sqrt, log, exp, trig, round) and aggregates (mean, sum, stdev, …).
 - **Control charts (SPC)** — Xbar-R, Xbar-S, I-MR, P, NP, C, U (with Nelson tests 1 & 2).
 - **Quality tools** — normal process capability (Cp, Cpk, Pp, Ppk, Cpm); crossed **Gage R&R**
   (ANOVA method: variance components, %study var, distinct categories); power & sample-size
@@ -51,7 +53,7 @@ that is converted to a Core `Worksheet` whenever an analysis runs.
 ```
 dotnet build StatStudio.slnx
 dotnet run  --project src/StatStudio.Wpf
-dotnet run  --project tools/StatStudio.Smoke      # 258 numeric checks vs reference values
+dotnet run  --project tools/StatStudio.Smoke      # 277 numeric checks vs reference values
 ```
 
 `StatStudio.Wpf --demo` loads a sample dataset and runs a few analyses (see `ProcessArgs` for the
@@ -66,7 +68,11 @@ powershell -ExecutionPolicy Bypass -File tools/e2e-install.ps1           # insta
 
 Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
 
-## Not yet included
+## Scope
 
-Mixture designs and a worksheet calculator language. The engine-per-analysis + dialog +
-Session-output design makes these additive.
+StatStudio now covers Minitab's mainstream surface: basic statistics, nonparametrics,
+ANOVA/regression (incl. logistic), the full DOE suite (factorial, fractional, response-surface,
+mixture), SPC + capability + Gage R&R, the full time-series suite (smoothing, decomposition,
+ARIMA/SARIMA), multivariate (PCA, factor analysis, clustering), reliability/survival, power &
+sample size, and a worksheet calculator — all engine-verified by 277 reference checks. The
+engine-per-analysis + dialog + Session-output design keeps further additions incremental.
