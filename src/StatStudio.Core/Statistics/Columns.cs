@@ -42,6 +42,24 @@ public static class Columns
         return result;
     }
 
+    /// <summary>Row-aligned response (numeric) with two categorical factors (text labels).</summary>
+    public static (double[] Y, string[] A, string[] B) Factorial(DataColumn response, DataColumn facA, DataColumn facB)
+    {
+        int n = Math.Max(response.Count, Math.Max(facA.Count, facB.Count));
+        var y = new List<double>(n);
+        var a = new List<string>(n);
+        var b = new List<string>(n);
+        for (int r = 0; r < n; r++)
+        {
+            if (response.IsMissing(r) || facA.IsMissing(r) || facB.IsMissing(r)) continue;
+            if (DataColumn.TryParse(response[r], out var yv))
+            {
+                y.Add(yv); a.Add(facA[r]!); b.Add(facB[r]!);
+            }
+        }
+        return (y.ToArray(), a.ToArray(), b.ToArray());
+    }
+
     /// <summary>
     /// Row-aligned response/predictor matrix for rows where the response and every
     /// predictor hold a number. Returns y plus one array per predictor column.

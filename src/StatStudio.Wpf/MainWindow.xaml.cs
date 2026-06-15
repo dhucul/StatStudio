@@ -61,6 +61,18 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-tukey": var wtk = BuildAnovaDemo();
+                    var tkGroups = new (string, double[])[]
+                    {
+                        ("Method A", wtk.Find("Method A")!.NumericValues()),
+                        ("Method B", wtk.Find("Method B")!.NumericValues()),
+                        ("Method C", wtk.Find("Method C")!.NumericValues()),
+                    };
+                    OutputRaw(AdvancedFormatters.Tukey(AnovaExtensions.Tukey(tkGroups))); break;
+                case "--shot-logistic":
+                    var lx = Enumerable.Repeat(0.0, 10).Concat(Enumerable.Repeat(1.0, 10)).ToArray();
+                    var ly = new double[] { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0 };
+                    OutputRaw(AdvancedFormatters.Logistic(Logistic.Fit(ly, new[] { lx }, new[] { "x" }, "y"))); break;
                 case "--shot-correlation": var wco = BuildAnovaDemo();
                     OutputRaw(NonparametricFormatters.Correlation(Correlation.Matrix(
                         new[] { wco.Find("Method A")!, wco.Find("Method B")!, wco.Find("Method C")! }, false)));
@@ -452,6 +464,99 @@ public partial class MainWindow : Window
         if (groups.Count < 2) { Log("Need at least 2 non-empty groups."); return; }
         var r = Anova.OneWay(groups);
         OutputRaw(AnovaFormatter.OneWay(r, "Factor", "Response"));
+        try { OutputRaw(AdvancedFormatters.Tukey(AnovaExtensions.Tukey(groups))); }
+        catch (Exception ex) { Log($"Tukey: {ex.Message}"); }
+    }
+
+    private void OnTwoWayAnova(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var all = ws.Columns.Select(c => c.Name).ToList();
+        var dlg = new TwoWayAnovaWindow(numeric, all) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var (y, a, b) = Columns.Factorial(ws.Find(dlg.Response)!, ws.Find(dlg.FactorA)!, ws.Find(dlg.FactorB)!);
+        if (y.Length < 4) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(AdvancedFormatters.TwoWayAnova(AnovaExtensions.TwoWay(y, a, b, dlg.FactorA, dlg.FactorB), dlg.Response)); }
+        catch (Exception ex) { Log($"Two-way ANOVA: {ex.Message}"); }
+    }
+
+    private void OnEqualVariances(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new ColumnPickerWindow("Test for Equal Variances", "Group columns:", numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var groups = dlg.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
+            .Where(t => t.Item2.Length > 1).ToList();
+        if (groups.Count < 2) { Log("Need at least 2 groups with >1 value."); return; }
+        try { OutputRaw(AdvancedFormatters.EqualVariances(VarianceTests.EqualVariances(groups), "Response", "Factor")); }
+        catch (Exception ex) { Log($"Equal variances: {ex.Message}"); }
+    }
+
+    private void OnTwoVariances(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new TwoColumnWindow(numeric, "2 Variances (F-Test)", showPooled: false) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var x1 = ws.Find(dlg.Column1)!.NumericValues();
+        var x2 = ws.Find(dlg.Column2)!.NumericValues();
+        if (x1.Length < 2 || x2.Length < 2) { Log("Each sample needs at least 2 values."); return; }
+        OutputRaw(AdvancedFormatters.FTest(VarianceTests.FTest(x1, x2, dlg.Confidence), dlg.Column1, dlg.Column2));
+    }
+
+    private void OnPolynomialRegression(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new PolynomialWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var (xs, ys) = Columns.Pairwise(ws.Find(dlg.XColumn)!, ws.Find(dlg.YColumn)!);
+        if (xs.Length <= dlg.Degree + 1) { Log("Not enough points for that degree."); return; }
+        try
+        {
+            var r = RegressionExtensions.Polynomial(xs, ys, dlg.Degree, dlg.XColumn, dlg.YColumn);
+            OutputRaw(RegressionFormatter.Format(r));
+            ShowGraph("Residuals vs Fitted", p => Plots.ResidualVsFitted(p, r.Fitted, r.Residuals));
+        }
+        catch (Exception ex) { Log($"Polynomial regression: {ex.Message}"); }
+    }
+
+    private void OnBestSubsets(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Best Subsets Regression" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(AdvancedFormatters.BestSubsets(RegressionExtensions.BestSubsets(y, x, dlg.Predictors))); }
+        catch (Exception ex) { Log($"Best subsets: {ex.Message}"); }
+    }
+
+    private void OnStepwise(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Stepwise Regression" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(AdvancedFormatters.Stepwise(RegressionExtensions.Stepwise(y, x, dlg.Predictors))); }
+        catch (Exception ex) { Log($"Stepwise: {ex.Message}"); }
+    }
+
+    private void OnLogistic(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Binary Logistic Regression" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(AdvancedFormatters.Logistic(Logistic.Fit(y, x, dlg.Predictors, dlg.Response))); }
+        catch (Exception ex) { Log($"Logistic regression: {ex.Message} (response must be coded 0/1)"); }
     }
 
     // ---- Nonparametrics ----------------------------------------------------

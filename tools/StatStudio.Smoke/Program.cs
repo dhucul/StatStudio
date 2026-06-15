@@ -11,6 +11,7 @@ internal static class Program
         RegrTests.Run();
         SpcTests.Run();
         NonparTests.Run();
+        AdvancedTests.Run();
         return Check.Summary();
     }
 }
