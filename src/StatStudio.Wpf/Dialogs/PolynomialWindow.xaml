@@ -1,6 +1,7 @@
 <Window x:Class="StatStudio.Wpf.Dialogs.PolynomialWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="#1E1E1E" Foreground="#D4D4D4"
         Title="Polynomial Regression" Height="240" Width="360"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="14">

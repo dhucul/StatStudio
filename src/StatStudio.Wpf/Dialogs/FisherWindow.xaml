@@ -1,6 +1,7 @@
 <Window x:Class="StatStudio.Wpf.Dialogs.FisherWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="#1E1E1E" Foreground="#D4D4D4"
         Title="Fisher's Exact Test (2×2)" Height="220" Width="300"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="16">

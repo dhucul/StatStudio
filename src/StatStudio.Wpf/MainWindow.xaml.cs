@@ -61,6 +61,10 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-dlg":
+                    new Dialogs.ColumnPickerWindow("DialogProbe", "Variables (numeric):",
+                        new[] { "Height", "Weight", "Group" }) { Owner = this }.Show();
+                    break;
                 case "--shot-bayes":
                     OutputRaw(BayesFormatters.Proportion(Bayes.Proportion(8, 10, 1, 1), "Sample"));
                     OutputRaw(MixedFormatters.OneWayRandom(MixedModel.OneWayRandom(new (string, double[])[]
