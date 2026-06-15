@@ -61,6 +61,15 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-pca": var wp = BuildDemo();
+                    var pcaCols = new[] { wp.Find("Height")!, wp.Find("Weight")! };
+                    var pcaRows = Columns.Rows(pcaCols).ToArray();
+                    var pcaR = Pca.Compute(pcaRows, new[] { "Height", "Weight" }, true);
+                    OutputRaw(MultivariateFormatters.Pca(pcaR));
+                    OutputRaw(MultivariateFormatters.Power("1-Sample t", "sample size", 0.05, Alternative.TwoSided,
+                        "d = 0.5", Power.OneSampleTSampleSize(0.8, 0.5, 0.05, Alternative.TwoSided), 0.8));
+                    OutputRaw(MultivariateFormatters.Fisher(FishersExact.Test(3, 1, 1, 3)));
+                    ShowGraph("Scree Plot", p => Plots.Scree(p, pcaR.Eigenvalues)); break;
                 case "--shot-trend":
                     var inv = System.Globalization.CultureInfo.InvariantCulture;
                     var sales = Enumerable.Range(0, 24).Select(t => 100 + 2.0 * t + 10 * Math.Sin(t * Math.PI / 6)).ToArray();
@@ -569,6 +578,91 @@ public partial class MainWindow : Window
         if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
         try { OutputRaw(AdvancedFormatters.Logistic(Logistic.Fit(y, x, dlg.Predictors, dlg.Response))); }
         catch (Exception ex) { Log($"Logistic regression: {ex.Message} (response must be coded 0/1)"); }
+    }
+
+    // ---- Multivariate & power ---------------------------------------------
+
+    private void OnFishersExact(object sender, RoutedEventArgs e)
+    {
+        var dlg = new FisherWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        OutputRaw(MultivariateFormatters.Fisher(FishersExact.Test(dlg.CellA, dlg.CellB, dlg.CellC, dlg.CellD)));
+    }
+
+    private void OnPca(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new ColumnPickerWindow("Principal Components", "Variables (2 or more):", numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        if (cols.Count < 2) { Log("Select at least two variables."); return; }
+        var rows = Columns.Rows(cols);
+        if (rows.Count < 2) { Log("Not enough complete rows."); return; }
+        try
+        {
+            var r = Pca.Compute(rows.ToArray(), dlg.SelectedColumns, correlation: true);
+            OutputRaw(MultivariateFormatters.Pca(r));
+            ShowGraph("Scree Plot", p => Plots.Scree(p, r.Eigenvalues));
+        }
+        catch (Exception ex) { Log($"PCA: {ex.Message}"); }
+    }
+
+    private void OnKMeans(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new KMeansWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var rows = Columns.Rows(cols);
+        if (rows.Count < dlg.K) { Log("Need at least k complete rows."); return; }
+        try
+        {
+            var r = KMeans.Cluster(rows.ToArray(), dlg.K, dlg.SelectedColumns);
+            OutputRaw(MultivariateFormatters.KMeans(r));
+            if (dlg.SelectedColumns.Count == 2)
+                ShowGraph("K-Means Clusters",
+                    p => Plots.ClusterScatter(p, dlg.SelectedColumns[0], dlg.SelectedColumns[1], rows.ToArray(), r.Assignments, r.K));
+        }
+        catch (Exception ex) { Log($"K-Means: {ex.Message}"); }
+    }
+
+    private void OnPowerSampleSize(object sender, RoutedEventArgs e)
+    {
+        var dlg = new PowerWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+
+        string test = dlg.TestIndex switch { 1 => "2-Sample t", 2 => "1 Proportion", _ => "1-Sample t" };
+        string solveFor = dlg.SolveForPower ? "power" : "sample size";
+        double n, power, effectVal;
+        string effectDesc;
+
+        if (dlg.TestIndex == 2)
+        {
+            effectDesc = $"p0 = {dlg.P0}, p1 = {dlg.P1}";
+            if (dlg.SolveForPower) { n = dlg.N; power = Power.OneProportionPower(n, dlg.P0, dlg.P1, dlg.Alpha, dlg.Alt); }
+            else { power = dlg.TargetPower; n = Power.OneProportionSampleSize(power, dlg.P0, dlg.P1, dlg.Alpha, dlg.Alt); }
+        }
+        else
+        {
+            effectVal = dlg.EffectSize;
+            effectDesc = $"d = {effectVal}";
+            bool two = dlg.TestIndex == 1;
+            if (dlg.SolveForPower)
+            {
+                n = dlg.N;
+                power = two ? Power.TwoSampleTPower(n, effectVal, dlg.Alpha, dlg.Alt)
+                            : Power.OneSampleTPower(n, effectVal, dlg.Alpha, dlg.Alt);
+            }
+            else
+            {
+                power = dlg.TargetPower;
+                n = two ? Power.TwoSampleTSampleSize(power, effectVal, dlg.Alpha, dlg.Alt)
+                        : Power.OneSampleTSampleSize(power, effectVal, dlg.Alpha, dlg.Alt);
+            }
+        }
+        OutputRaw(MultivariateFormatters.Power(test, solveFor, dlg.Alpha, dlg.Alt, effectDesc, n, power));
     }
 
     // ---- Time series -------------------------------------------------------

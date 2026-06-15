@@ -13,6 +13,7 @@ internal static class Program
         NonparTests.Run();
         AdvancedTests.Run();
         TimeSeriesTests.Run();
+        MultiTests.Run();
         return Check.Summary();
     }
 }

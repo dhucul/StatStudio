@@ -1,0 +1,22 @@
+<Window x:Class="StatStudio.Wpf.Dialogs.KMeansWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="K-Means Cluster Analysis" Height="440" Width="380"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Foreground="#9CDCFE" Margin="0,0,0,8" Text="Variables (numeric):"/>
+        <DockPanel DockPanel.Dock="Bottom">
+            <TextBlock Text="Number of clusters (k):" VerticalAlignment="Center" Margin="0,8,8,0"/>
+            <TextBox x:Name="KBox" Text="3" Width="60" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+        </DockPanel>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="OK" Width="80" Click="OnOk" IsDefault="True"/>
+            <Button Content="Cancel" Width="80" Margin="6,0,0,0" IsCancel="True"/>
+        </StackPanel>
+        <Border BorderBrush="#3C3C3C" BorderThickness="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="List" Margin="4"/>
+            </ScrollViewer>
+        </Border>
+    </DockPanel>
+</Window>

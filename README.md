@@ -9,12 +9,18 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
 - **Worksheet** — editable column grid (C1, C2, …); import/export **CSV/TSV** and **Excel (.xlsx)**;
   native **`.ssproj`** project files; missing values as `*`.
 - **Basic Statistics** — descriptive statistics (Minitab quartile method), 1-sample / 2-sample
-  (pooled & Welch) / paired *t*, 1- & 2-proportion, chi-square goodness-of-fit and association.
-- **ANOVA** — one-way.
-- **Regression** — simple & multiple linear, with coefficient SE/t/p, R²/adj-R²/S, ANOVA table,
-  fitted-line and residual-vs-fitted plots.
+  (pooled & Welch) / paired *t*, 1- & 2-proportion, chi-square goodness-of-fit and association,
+  Pearson/Spearman correlation, Anderson-Darling normality, F-test for two variances, Fisher's exact.
+- **Nonparametrics** — Mann-Whitney, Wilcoxon signed-rank, Kruskal-Wallis, sign test, runs test.
+- **ANOVA** — one-way (with Tukey HSD post-hoc), two-way (with interaction), tests for equal variances (Bartlett, Levene).
+- **Regression** — simple, multiple, polynomial, best-subsets (Mallows Cp), stepwise, and binary
+  logistic; coefficient SE/t/p, R²/adj-R²/S, ANOVA table, fitted-line and residual plots.
+- **Time series** — trend analysis, moving average, single/double/Winters exponential smoothing,
+  classical decomposition, ACF/PACF; with MAPE/MAD/MSD accuracy and actual/fitted/forecast plots.
+- **Multivariate** — principal components (scree plot), k-means clustering.
 - **Control charts (SPC)** — Xbar-R, Xbar-S, I-MR, P, NP, C, U (with Nelson tests 1 & 2).
-- **Quality tools** — normal process capability (Cp, Cpk, Pp, Ppk, Cpm).
+- **Quality & DOE-adjacent** — normal process capability (Cp, Cpk, Pp, Ppk, Cpm); power & sample-size
+  calculators (1-/2-sample t, 1-proportion).
 - **Graphs** — histogram, boxplot, scatterplot, time-series plot, normal probability plot.
 
 ## Layout
@@ -36,7 +42,7 @@ that is converted to a Core `Worksheet` whenever an analysis runs.
 ```
 dotnet build StatStudio.slnx
 dotnet run  --project src/StatStudio.Wpf
-dotnet run  --project tools/StatStudio.Smoke      # 112 numeric checks vs reference values
+dotnet run  --project tools/StatStudio.Smoke      # 192 numeric checks vs reference values
 ```
 
 `StatStudio.Wpf --demo` loads a sample dataset and runs a few analyses (see `ProcessArgs` for the
@@ -53,5 +59,6 @@ Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
 
 ## Not yet included
 
-DOE, time series (ARIMA), multivariate, reliability, Gage R&R, and a worksheet calculator
-language. The engine-per-analysis + dialog + Session-output design makes these additive.
+Designed experiments (factorial/RSM), ARIMA, factor analysis, reliability/survival, Gage R&R,
+and a worksheet calculator language. The engine-per-analysis + dialog + Session-output design
+makes these additive.

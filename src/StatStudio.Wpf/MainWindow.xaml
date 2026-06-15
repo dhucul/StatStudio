@@ -33,6 +33,7 @@
                     <MenuItem Header="Correlation (_Spearman)…" Click="OnCorrelationSpearman"/>
                     <MenuItem Header="_Normality Test (Anderson-Darling)…" Click="OnNormalityTest"/>
                     <MenuItem Header="_2 Variances (F-Test)…" Click="OnTwoVariances"/>
+                    <MenuItem Header="_Fisher's Exact Test (2×2)…" Click="OnFishersExact"/>
                 </MenuItem>
                 <MenuItem Header="_ANOVA">
                     <MenuItem Header="_One-Way (with Tukey)…" Click="OnOneWayAnova"/>
@@ -69,6 +70,11 @@
                     <MenuItem Header="_Autocorrelation (ACF)…" Click="OnAcf"/>
                     <MenuItem Header="_Partial Autocorrelation (PACF)…" Click="OnPacf"/>
                 </MenuItem>
+                <MenuItem Header="_Multivariate">
+                    <MenuItem Header="_Principal Components…" Click="OnPca"/>
+                    <MenuItem Header="Cluster _K-Means…" Click="OnKMeans"/>
+                </MenuItem>
+                <MenuItem Header="Po_wer and Sample Size…" Click="OnPowerSampleSize"/>
                 <MenuItem Header="_Control Charts">
                     <MenuItem Header="Xbar-_R…" Click="OnXbarR"/>
                     <MenuItem Header="Xbar-_S…" Click="OnXbarS"/>

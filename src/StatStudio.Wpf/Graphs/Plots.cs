@@ -235,6 +235,32 @@ internal static class Plots
         p.Title(title); p.XLabel("Lag"); p.YLabel(yLabel);
     }
 
+    public static void Scree(Plot p, double[] eigenvalues)
+    {
+        var xs = Enumerable.Range(1, eigenvalues.Length).Select(i => (double)i).ToArray();
+        var line = p.Add.Scatter(xs, eigenvalues);
+        line.Color = Accent; line.MarkerSize = 7; line.LineWidth = 2;
+        var one = p.Add.HorizontalLine(1.0);
+        one.Color = Color.FromHex("#ED5565"); one.LineWidth = 1; one.LinePattern = LinePattern.Dashed;
+        p.Title("Scree Plot");
+        p.XLabel("Component number"); p.YLabel("Eigenvalue");
+    }
+
+    public static void ClusterScatter(Plot p, string xName, string yName, double[][] data, int[] assign, int k)
+    {
+        for (int c = 0; c < k; c++)
+        {
+            var xs = new List<double>(); var ys = new List<double>();
+            for (int i = 0; i < data.Length; i++) if (assign[i] == c) { xs.Add(data[i][0]); ys.Add(data[i][1]); }
+            if (xs.Count == 0) continue;
+            var sp = p.Add.ScatterPoints(xs.ToArray(), ys.ToArray());
+            sp.Color = Palette[c % Palette.Length]; sp.MarkerSize = 8; sp.LegendText = $"Cluster {c + 1}";
+        }
+        p.ShowLegend();
+        p.Title("K-Means Clusters");
+        p.XLabel(xName); p.YLabel(yName);
+    }
+
     public static void CapabilityHistogram(Plot p, string name, double[] values, double? lsl, double? usl, double? target)
     {
         Histogram(p, name, values);
