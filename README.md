@@ -20,6 +20,10 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
   (forecasts with confidence bands); MAPE/MAD/MSD accuracy and actual/fitted/forecast plots.
 - **Multivariate** — principal components (scree plot), factor analysis (varimax rotation),
   k-means clustering.
+- **Bayesian** — Beta-Binomial proportion, 1-sample normal mean (known & unknown variance),
+  and reference-prior linear regression: posterior summaries, credible intervals, tail probabilities.
+- **Mixed / hierarchical** — one-way random-effects (random-intercept) model: variance components,
+  intraclass correlation, and shrinkage (BLUP) group estimates.
 - **Reliability / survival** — parametric life-data fitting (Weibull/exponential/lognormal/normal
   MLE with percentiles + Weibull probability plot) and Kaplan-Meier survival (right-censoring).
 - **DOE** — create full 2^k / 2^(k-p) fractional factorial designs (generators, resolution,
@@ -53,7 +57,7 @@ that is converted to a Core `Worksheet` whenever an analysis runs.
 ```
 dotnet build StatStudio.slnx
 dotnet run  --project src/StatStudio.Wpf
-dotnet run  --project tools/StatStudio.Smoke      # 277 numeric checks vs reference values
+dotnet run  --project tools/StatStudio.Smoke      # 294 numeric checks vs reference values
 ```
 
 `StatStudio.Wpf --demo` loads a sample dataset and runs a few analyses (see `ProcessArgs` for the
@@ -70,9 +74,10 @@ Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
 
 ## Scope
 
-StatStudio now covers Minitab's mainstream surface: basic statistics, nonparametrics,
+StatStudio covers Minitab's mainstream surface and beyond: basic statistics, nonparametrics,
 ANOVA/regression (incl. logistic), the full DOE suite (factorial, fractional, response-surface,
 mixture), SPC + capability + Gage R&R, the full time-series suite (smoothing, decomposition,
 ARIMA/SARIMA), multivariate (PCA, factor analysis, clustering), reliability/survival, power &
-sample size, and a worksheet calculator — all engine-verified by 277 reference checks. The
-engine-per-analysis + dialog + Session-output design keeps further additions incremental.
+sample size, conjugate Bayesian inference, one-way mixed/hierarchical models, and a worksheet
+calculator — all engine-verified by 294 reference checks. The engine-per-analysis + dialog +
+Session-output design keeps further additions incremental.

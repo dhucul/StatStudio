@@ -61,6 +61,15 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-bayes":
+                    OutputRaw(BayesFormatters.Proportion(Bayes.Proportion(8, 10, 1, 1), "Sample"));
+                    OutputRaw(MixedFormatters.OneWayRandom(MixedModel.OneWayRandom(new (string, double[])[]
+                    {
+                        ("G1", new double[] { 1, 2, 3 }),
+                        ("G2", new double[] { 4, 5, 6 }),
+                        ("G3", new double[] { 7, 8, 9 }),
+                    }), "Yield", "Group"));
+                    break;
                 case "--shot-calc":
                     BuildDemo();
                     var cwx = CurrentWorksheet();
@@ -681,6 +690,56 @@ public partial class MainWindow : Window
                     p => Plots.ClusterScatter(p, dlg.SelectedColumns[0], dlg.SelectedColumns[1], rows.ToArray(), r.Assignments, r.K));
         }
         catch (Exception ex) { Log($"K-Means: {ex.Message}"); }
+    }
+
+    // ---- Bayesian & mixed --------------------------------------------------
+
+    private void OnBayesProportion(object sender, RoutedEventArgs e)
+    {
+        var dlg = new BayesProportionWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var r = Bayes.Proportion(dlg.X, dlg.N, dlg.PriorA, dlg.PriorB, dlg.Confidence, dlg.Threshold);
+        OutputRaw(BayesFormatters.Proportion(r, "Sample"));
+    }
+
+    private void OnBayesNormal(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new BayesNormalWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var v = ws.Find(dlg.DataColumn)!.NumericValues();
+        if (v.Length < 2) { Log("Need at least 2 values."); return; }
+        var r = dlg.KnownVariance
+            ? Bayes.NormalMeanKnownVar(v, dlg.PriorMean, dlg.PriorSd, dlg.KnownSigma, dlg.Confidence, dlg.Threshold)
+            : Bayes.NormalMeanUnknownVar(v, dlg.Confidence, dlg.Threshold);
+        OutputRaw(BayesFormatters.NormalMean(r, dlg.DataColumn));
+    }
+
+    private void OnBayesRegression(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Bayesian Linear Regression" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(BayesFormatters.Regression(Bayes.LinearRegression(y, x, dlg.Predictors, dlg.Response))); }
+        catch (Exception ex) { Log($"Bayesian regression: {ex.Message}"); }
+    }
+
+    private void OnOneWayRandom(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new ColumnPickerWindow("One-Way Random Effects",
+            "Group columns (each column is a random-effect level):", numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var groups = dlg.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
+            .Where(t => t.Item2.Length > 0).ToList();
+        if (groups.Count < 2) { Log("Need at least 2 groups."); return; }
+        try { OutputRaw(MixedFormatters.OneWayRandom(MixedModel.OneWayRandom(groups), "Response", "Group")); }
+        catch (Exception ex) { Log($"Random-effects model: {ex.Message}"); }
     }
 
     private void OnFactorAnalysis(object sender, RoutedEventArgs e)

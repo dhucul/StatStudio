@@ -97,6 +97,14 @@
                     <MenuItem Header="Analyze _Mixture Design…" Click="OnAnalyzeMixture"/>
                 </MenuItem>
                 <MenuItem Header="Po_wer and Sample Size…" Click="OnPowerSampleSize"/>
+                <MenuItem Header="_Bayesian Statistics">
+                    <MenuItem Header="_Proportion…" Click="OnBayesProportion"/>
+                    <MenuItem Header="1-Sample _Normal Mean…" Click="OnBayesNormal"/>
+                    <MenuItem Header="Linear _Regression…" Click="OnBayesRegression"/>
+                </MenuItem>
+                <MenuItem Header="Mi_xed / Hierarchical">
+                    <MenuItem Header="_One-Way Random Effects…" Click="OnOneWayRandom"/>
+                </MenuItem>
                 <MenuItem Header="_Control Charts">
                     <MenuItem Header="Xbar-_R…" Click="OnXbarR"/>
                     <MenuItem Header="Xbar-_S…" Click="OnXbarS"/>
