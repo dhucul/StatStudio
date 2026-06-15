@@ -192,6 +192,49 @@ internal static class Plots
         p.YLabel(chart.YLabel);
     }
 
+    public static void TimeSeriesFit(Plot p, string name, double[] actual, double[] fitted, double[] forecasts)
+    {
+        int n = actual.Length;
+        var xs = Enumerable.Range(1, n).Select(i => (double)i).ToArray();
+        var act = p.Add.Scatter(xs, actual);
+        act.Color = Accent; act.MarkerSize = 5; act.LineWidth = 1.5f; act.LegendText = "Actual";
+
+        var fx = new List<double>(); var fy = new List<double>();
+        for (int i = 0; i < n; i++) if (!double.IsNaN(fitted[i])) { fx.Add(xs[i]); fy.Add(fitted[i]); }
+        if (fx.Count > 0)
+        {
+            var fit = p.Add.Scatter(fx.ToArray(), fy.ToArray());
+            fit.Color = Color.FromHex("#F6BB42"); fit.MarkerSize = 0; fit.LineWidth = 2; fit.LegendText = "Fitted";
+        }
+        if (forecasts.Length > 0)
+        {
+            var fxs = Enumerable.Range(n + 1, forecasts.Length).Select(i => (double)i).ToArray();
+            var fcl = p.Add.Scatter(fxs, forecasts);
+            fcl.Color = Color.FromHex("#A0D468"); fcl.MarkerSize = 5; fcl.LineWidth = 2;
+            fcl.LinePattern = LinePattern.Dashed; fcl.LegendText = "Forecast";
+        }
+        p.ShowLegend();
+        p.Title($"Time Series Plot of {name}");
+        p.XLabel("Period"); p.YLabel(name);
+    }
+
+    public static void Acf(Plot p, string title, double[] values, int n, string yLabel)
+    {
+        var bars = new List<Bar>();
+        for (int k = 1; k < values.Length; k++)
+            bars.Add(new Bar { Position = k, Value = values[k], Size = 0.25, FillColor = Accent, LineWidth = 0 });
+        p.Add.Bars(bars);
+
+        double bound = 1.96 / Math.Sqrt(n);
+        foreach (var b in new[] { bound, -bound })
+        {
+            var ln = p.Add.HorizontalLine(b);
+            ln.Color = Color.FromHex("#ED5565"); ln.LineWidth = 1; ln.LinePattern = LinePattern.Dashed;
+        }
+        var zero = p.Add.HorizontalLine(0); zero.Color = Fg; zero.LineWidth = 1;
+        p.Title(title); p.XLabel("Lag"); p.YLabel(yLabel);
+    }
+
     public static void CapabilityHistogram(Plot p, string name, double[] values, double? lsl, double? usl, double? target)
     {
         Histogram(p, name, values);

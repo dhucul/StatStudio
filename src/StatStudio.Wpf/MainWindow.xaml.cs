@@ -61,6 +61,18 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-trend":
+                    var inv = System.Globalization.CultureInfo.InvariantCulture;
+                    var sales = Enumerable.Range(0, 24).Select(t => 100 + 2.0 * t + 10 * Math.Sin(t * Math.PI / 6)).ToArray();
+                    var wsS = new CoreData.Worksheet { Name = "TS" };
+                    var scol = wsS.AddColumn("Sales");
+                    foreach (var s in sales) scol.Add(s.ToString("F2", inv));
+                    LoadWorksheet(wsS);
+                    var tr = TimeSeries.LinearTrend(sales, 4);
+                    OutputRaw(TimeSeriesFormatters.Trend(tr, "Sales", sales.Length));
+                    OutputRaw(TimeSeriesFormatters.Acf(TimeSeries.Autocorrelation(sales, 12), "Sales", false));
+                    ShowGraph("Trend Analysis of Sales", p => Plots.TimeSeriesFit(p, "Sales", sales, tr.Fitted, tr.Forecasts));
+                    break;
                 case "--shot-tukey": var wtk = BuildAnovaDemo();
                     var tkGroups = new (string, double[])[]
                     {
@@ -557,6 +569,99 @@ public partial class MainWindow : Window
         if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
         try { OutputRaw(AdvancedFormatters.Logistic(Logistic.Fit(y, x, dlg.Predictors, dlg.Response))); }
         catch (Exception ex) { Log($"Logistic regression: {ex.Message} (response must be coded 0/1)"); }
+    }
+
+    // ---- Time series -------------------------------------------------------
+
+    private double[]? OpenSeries(string title, TsFields fields, out TimeSeriesWindow dlg, out string name)
+    {
+        dlg = null!; name = "";
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return null;
+        dlg = new TimeSeriesWindow(numeric, title, fields) { Owner = this };
+        if (dlg.ShowDialog() != true) return null;
+        name = dlg.SeriesColumn;
+        return ws.Find(name)!.NumericValues();
+    }
+
+    private void OnTrendAnalysis(object sender, RoutedEventArgs e)
+    {
+        var v = OpenSeries("Trend Analysis", TsFields.TrendType | TsFields.Forecasts, out var dlg, out var name);
+        if (v is null) return;
+        if (v.Length < 3) { Log("Need at least 3 points."); return; }
+        var r = dlg.Quadratic ? TimeSeries.QuadraticTrend(v, dlg.Forecasts) : TimeSeries.LinearTrend(v, dlg.Forecasts);
+        OutputRaw(TimeSeriesFormatters.Trend(r, name, v.Length));
+        ShowGraph($"Trend Analysis of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+    }
+
+    private void OnMovingAverage(object sender, RoutedEventArgs e)
+    {
+        var v = OpenSeries("Moving Average", TsFields.Length | TsFields.Forecasts, out var dlg, out var name);
+        if (v is null) return;
+        if (v.Length <= dlg.Length) { Log("Series shorter than the MA length."); return; }
+        var r = TimeSeries.MovingAverage(v, dlg.Length, dlg.Forecasts);
+        OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
+        ShowGraph($"Moving Average of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+    }
+
+    private void OnSingleExp(object sender, RoutedEventArgs e)
+    {
+        var v = OpenSeries("Single Exponential Smoothing", TsFields.Alpha | TsFields.Forecasts, out var dlg, out var name);
+        if (v is null) return;
+        if (v.Length < 2) { Log("Need at least 2 points."); return; }
+        var r = TimeSeries.SingleExp(v, dlg.Alpha, dlg.Forecasts);
+        OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
+        ShowGraph($"Single Exp Smoothing of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+    }
+
+    private void OnDoubleExp(object sender, RoutedEventArgs e)
+    {
+        var v = OpenSeries("Double Exponential Smoothing", TsFields.Alpha | TsFields.Beta | TsFields.Forecasts, out var dlg, out var name);
+        if (v is null) return;
+        if (v.Length < 3) { Log("Need at least 3 points."); return; }
+        var r = TimeSeries.DoubleExp(v, dlg.Alpha, dlg.Beta, dlg.Forecasts);
+        OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
+        ShowGraph($"Double Exp Smoothing of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+    }
+
+    private void OnWinters(object sender, RoutedEventArgs e)
+    {
+        var v = OpenSeries("Winters' Method",
+            TsFields.Period | TsFields.Alpha | TsFields.Beta | TsFields.Gamma | TsFields.Multiplicative | TsFields.Forecasts,
+            out var dlg, out var name);
+        if (v is null) return;
+        try
+        {
+            var r = TimeSeries.Winters(v, dlg.Period, dlg.Alpha, dlg.Beta, dlg.Gamma, dlg.Multiplicative, dlg.Forecasts);
+            OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
+            ShowGraph($"Winters' Method of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+        }
+        catch (Exception ex) { Log($"Winters: {ex.Message}"); }
+    }
+
+    private void OnDecomposition(object sender, RoutedEventArgs e)
+    {
+        var v = OpenSeries("Time Series Decomposition", TsFields.Period | TsFields.Multiplicative, out var dlg, out var name);
+        if (v is null) return;
+        if (v.Length < 2 * dlg.Period) { Log("Need at least two full seasons."); return; }
+        var r = TimeSeries.Decompose(v, dlg.Period, dlg.Multiplicative);
+        OutputRaw(TimeSeriesFormatters.Decomposition(r, name));
+        ShowGraph($"Decomposition of {name} (trend)", p => Plots.TimeSeriesFit(p, name, v, r.Trend, Array.Empty<double>()));
+    }
+
+    private void OnAcf(object sender, RoutedEventArgs e) => RunAcf(false);
+    private void OnPacf(object sender, RoutedEventArgs e) => RunAcf(true);
+
+    private void RunAcf(bool partial)
+    {
+        var v = OpenSeries(partial ? "Partial Autocorrelation" : "Autocorrelation", TsFields.MaxLag, out var dlg, out var name);
+        if (v is null) return;
+        if (v.Length < 4) { Log("Need at least 4 points."); return; }
+        var r = TimeSeries.Autocorrelation(v, dlg.MaxLag);
+        OutputRaw(TimeSeriesFormatters.Acf(r, name, partial));
+        var vals = partial ? r.Pacf : r.Acf;
+        ShowGraph($"{(partial ? "PACF" : "ACF")} of {name}",
+            p => Plots.Acf(p, $"{(partial ? "PACF" : "ACF")} of {name}", vals, r.N, partial ? "PACF" : "ACF"));
     }
 
     // ---- Nonparametrics ----------------------------------------------------

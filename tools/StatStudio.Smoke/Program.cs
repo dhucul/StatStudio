@@ -12,6 +12,7 @@ internal static class Program
         SpcTests.Run();
         NonparTests.Run();
         AdvancedTests.Run();
+        TimeSeriesTests.Run();
         return Check.Summary();
     }
 }

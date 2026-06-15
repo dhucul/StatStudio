@@ -57,6 +57,18 @@
                     <Separator/>
                     <MenuItem Header="Binary _Logistic Regression…" Click="OnLogistic"/>
                 </MenuItem>
+                <MenuItem Header="_Time Series">
+                    <MenuItem Header="_Trend Analysis…" Click="OnTrendAnalysis"/>
+                    <MenuItem Header="_Moving Average…" Click="OnMovingAverage"/>
+                    <Separator/>
+                    <MenuItem Header="_Single Exp Smoothing…" Click="OnSingleExp"/>
+                    <MenuItem Header="_Double Exp Smoothing…" Click="OnDoubleExp"/>
+                    <MenuItem Header="_Winters' Method…" Click="OnWinters"/>
+                    <Separator/>
+                    <MenuItem Header="_Decomposition…" Click="OnDecomposition"/>
+                    <MenuItem Header="_Autocorrelation (ACF)…" Click="OnAcf"/>
+                    <MenuItem Header="_Partial Autocorrelation (PACF)…" Click="OnPacf"/>
+                </MenuItem>
                 <MenuItem Header="_Control Charts">
                     <MenuItem Header="Xbar-_R…" Click="OnXbarR"/>
                     <MenuItem Header="Xbar-_S…" Click="OnXbarS"/>
