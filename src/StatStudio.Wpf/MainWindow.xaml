@@ -28,9 +28,20 @@
                     <Separator/>
                     <MenuItem Header="Chi-Square _Goodness-of-Fit…" Click="OnChiSquareGof"/>
                     <MenuItem Header="_Cross Tabulation &amp; Chi-Square…" Click="OnChiSquareAssoc"/>
+                    <Separator/>
+                    <MenuItem Header="Co_rrelation (Pearson)…" Click="OnCorrelationPearson"/>
+                    <MenuItem Header="Correlation (_Spearman)…" Click="OnCorrelationSpearman"/>
+                    <MenuItem Header="_Normality Test (Anderson-Darling)…" Click="OnNormalityTest"/>
                 </MenuItem>
                 <MenuItem Header="_ANOVA">
                     <MenuItem Header="_One-Way…" Click="OnOneWayAnova"/>
+                </MenuItem>
+                <MenuItem Header="_Nonparametrics">
+                    <MenuItem Header="_Mann-Whitney…" Click="OnMannWhitney"/>
+                    <MenuItem Header="_Wilcoxon Signed-Rank (1-Sample)…" Click="OnWilcoxon"/>
+                    <MenuItem Header="_Kruskal-Wallis…" Click="OnKruskalWallis"/>
+                    <MenuItem Header="_Sign Test (1-Sample)…" Click="OnSignTest"/>
+                    <MenuItem Header="_Runs Test…" Click="OnRunsTest"/>
                 </MenuItem>
                 <MenuItem Header="_Regression">
                     <MenuItem Header="_Simple Regression…" Click="OnSimpleRegression"/>

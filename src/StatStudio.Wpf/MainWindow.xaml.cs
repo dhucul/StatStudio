@@ -61,6 +61,15 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-correlation": var wco = BuildAnovaDemo();
+                    OutputRaw(NonparametricFormatters.Correlation(Correlation.Matrix(
+                        new[] { wco.Find("Method A")!, wco.Find("Method B")!, wco.Find("Method C")! }, false)));
+                    OutputRaw(NonparametricFormatters.KruskalWallis(Nonparametric.KruskalWallis(new (string, double[])[]
+                    {
+                        ("Method A", wco.Find("Method A")!.NumericValues()),
+                        ("Method B", wco.Find("Method B")!.NumericValues()),
+                        ("Method C", wco.Find("Method C")!.NumericValues()),
+                    }), "Yield", "Method")); break;
                 case "--shot-anova": var wa = BuildAnovaDemo();
                     OutputRaw(AnovaFormatter.OneWay(Anova.OneWay(new (string, double[])[]
                     {
@@ -443,6 +452,109 @@ public partial class MainWindow : Window
         if (groups.Count < 2) { Log("Need at least 2 non-empty groups."); return; }
         var r = Anova.OneWay(groups);
         OutputRaw(AnovaFormatter.OneWay(r, "Factor", "Response"));
+    }
+
+    // ---- Nonparametrics ----------------------------------------------------
+
+    private void OnMannWhitney(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new TwoColumnWindow(numeric, "Mann-Whitney", showPooled: false) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var x1 = ws.Find(dlg.Column1)!.NumericValues();
+        var x2 = ws.Find(dlg.Column2)!.NumericValues();
+        if (x1.Length < 1 || x2.Length < 1) { Log("Each sample needs data."); return; }
+        var r = Nonparametric.MannWhitney(x1, x2, dlg.Alt);
+        OutputRaw(NonparametricFormatters.MannWhitney(r, dlg.Column1, dlg.Column2));
+    }
+
+    private void OnWilcoxon(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new OneSampleTWindow(numeric) { Owner = this, Title = "Wilcoxon Signed-Rank" };
+        if (dlg.ShowDialog() != true) return;
+        foreach (var n in dlg.SelectedColumns)
+        {
+            var v = ws.Find(n)!.NumericValues();
+            if (v.Length < 2) { Log($"{n}: need at least 2 values."); continue; }
+            OutputRaw(NonparametricFormatters.Wilcoxon(
+                Nonparametric.WilcoxonSignedRank(v, dlg.Mu0, dlg.Alt), n, dlg.Mu0));
+        }
+    }
+
+    private void OnKruskalWallis(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new ColumnPickerWindow("Kruskal-Wallis", "Response columns (each column is a group):", numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var groups = dlg.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
+            .Where(t => t.Item2.Length > 0).ToList();
+        if (groups.Count < 2) { Log("Need at least 2 non-empty groups."); return; }
+        OutputRaw(NonparametricFormatters.KruskalWallis(Nonparametric.KruskalWallis(groups), "Response", "Factor"));
+    }
+
+    private void OnSignTest(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new OneSampleTWindow(numeric) { Owner = this, Title = "Sign Test for Median" };
+        if (dlg.ShowDialog() != true) return;
+        foreach (var n in dlg.SelectedColumns)
+        {
+            var v = ws.Find(n)!.NumericValues();
+            if (v.Length < 1) { Log($"{n}: no data."); continue; }
+            OutputRaw(NonparametricFormatters.SignTest(
+                Nonparametric.SignTest(v, dlg.Mu0, dlg.Alt), n, dlg.Mu0));
+        }
+    }
+
+    private void OnRunsTest(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new ColumnPickerWindow("Runs Test", "Columns to test for randomness:", numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        foreach (var n in dlg.SelectedColumns)
+        {
+            var v = ws.Find(n)!.NumericValues();
+            if (v.Length < 3) { Log($"{n}: need at least 3 values."); continue; }
+            OutputRaw(NonparametricFormatters.RunsTest(Nonparametric.RunsTest(v), n));
+        }
+    }
+
+    // ---- Correlation & normality ------------------------------------------
+
+    private void OnCorrelationPearson(object sender, RoutedEventArgs e) => Correlate(false);
+    private void OnCorrelationSpearman(object sender, RoutedEventArgs e) => Correlate(true);
+
+    private void Correlate(bool spearman)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new ColumnPickerWindow(spearman ? "Correlation (Spearman)" : "Correlation (Pearson)",
+            "Variables (2 or more):", numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        if (cols.Count < 2) { Log("Select at least two variables."); return; }
+        OutputRaw(NonparametricFormatters.Correlation(Correlation.Matrix(cols, spearman)));
+    }
+
+    private void OnNormalityTest(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new ColumnPickerWindow("Normality Test", "Variables to test:", numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        foreach (var n in dlg.SelectedColumns)
+        {
+            var v = ws.Find(n)!.NumericValues();
+            if (v.Length < 3) { Log($"{n}: need at least 3 values."); continue; }
+            OutputRaw(NonparametricFormatters.AndersonDarling(Normality.AndersonDarling(v), n));
+            ShowGraph($"Probability Plot of {n}", p => Plots.ProbabilityPlot(p, n, v));
+        }
     }
     private void OnSimpleRegression(object sender, RoutedEventArgs e)
     {

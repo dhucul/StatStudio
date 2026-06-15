@@ -10,6 +10,7 @@ internal static class Program
         HypoTests.Run();
         RegrTests.Run();
         SpcTests.Run();
+        NonparTests.Run();
         return Check.Summary();
     }
 }
