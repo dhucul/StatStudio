@@ -49,5 +49,31 @@ internal static class TimeSeriesTests
         var w = TimeSeries.Winters(y, 4, 0.2, 0.1, 0.1, multiplicative: true, forecasts: 4);
         Check.Equal(w.Forecasts.Length, 4, "forecast count");
         Check.True(w.Forecasts.All(double.IsFinite), "forecasts finite");
+
+        Check.Section("ARIMA(1,0,0) on 1..10 (exact AR via OLS)");
+        var line = Enumerable.Range(1, 10).Select(i => (double)i).ToArray();
+        var ar1 = Arima.Fit(line, 1, 0, 0, forecasts: 3);
+        ArimaTerm AT(ArimaResult r, string n) => r.Terms.First(t => t.Name == n);
+        Check.Close(AT(ar1, "AR(1)").Coef, 1.0, "AR(1) coef = 1", 1e-6);
+        Check.Close(AT(ar1, "Constant").Coef, 1.0, "constant = 1", 1e-6);
+        Check.Close(ar1.Forecasts[0], 11.0, "forecast t=11", 1e-4);
+
+        Check.Section("ARIMA(2,0,0) on Fibonacci (φ1=φ2=1)");
+        var fib = new double[] { 1, 1, 2, 3, 5, 8, 13, 21, 34, 55 };
+        var ar2 = Arima.Fit(fib, 2, 0, 0);
+        Check.Close(AT(ar2, "AR(1)").Coef, 1.0, "AR(1) = 1", 1e-6);
+        Check.Close(AT(ar2, "AR(2)").Coef, 1.0, "AR(2) = 1", 1e-6);
+
+        Check.Section("ARIMA(0,1,0) on 1..10 (difference -> drift)");
+        var ima = Arima.Fit(line, 0, 1, 0, forecasts: 3);
+        Check.Close(ima.Forecasts[0], 11.0, "forecast t=11", 1e-4);
+        Check.Close(ima.Forecasts[2], 13.0, "forecast t=13", 1e-4);
+
+        Check.Section("ARIMA(0,0,1) MA fit (reasonableness)");
+        var rnd = new Random(1);
+        var noisy = Enumerable.Range(0, 60).Select(_ => rnd.NextDouble() * 2 - 1).ToArray();
+        var ma1 = Arima.Fit(noisy, 0, 0, 1);
+        Check.True(double.IsFinite(ma1.Terms.First(t => t.Name == "MA(1)").Coef), "MA(1) coef finite");
+        Check.True(ma1.Sigma2 > 0, "residual variance positive");
     }
 }

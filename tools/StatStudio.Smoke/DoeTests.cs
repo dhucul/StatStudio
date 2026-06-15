@@ -19,6 +19,18 @@ internal static class DoeTests
         Check.Close(dot01, 0, "factors A,B orthogonal");
         Check.Close(dot12, 0, "factors B,C orthogonal");
 
+        Check.Section("DOE — fractional factorial 2^(4-1), D=ABC");
+        var frac = DoeDesign.FractionalFactorial(4, 8, randomize: false);
+        Check.Equal(frac.Runs, 8, "8 runs (half fraction)");
+        Check.Equal(frac.Resolution, 4, "resolution IV");
+        bool dIsAbc = frac.RunList.All(r => Math.Abs(r.Factors[3] - r.Factors[0] * r.Factors[1] * r.Factors[2]) < 1e-9);
+        Check.True(dIsAbc, "D = A·B·C for every run");
+        Check.True(frac.DefiningRelation.Contains("ABCD"), "defining relation I = ABCD");
+
+        var frac3 = DoeDesign.FractionalFactorial(3, 4, randomize: false);
+        Check.Equal(frac3.Resolution, 3, "2^(3-1) is resolution III");
+        Check.True(frac3.RunList.All(r => Math.Abs(r.Factors[2] - r.Factors[0] * r.Factors[1]) < 1e-9), "C = A·B");
+
         Check.Section("DOE — analyze 2^2 (y = 10 + 3A + 2B + 1AB)");
         var a = new double[] { -1, -1, 1, 1 };
         var b = new double[] { -1, 1, -1, 1 };

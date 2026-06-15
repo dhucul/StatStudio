@@ -218,6 +218,28 @@ internal static class Plots
         p.XLabel("Period"); p.YLabel(name);
     }
 
+    public static void ForecastPlot(Plot p, string name, double[] actual, double[] forecasts, double[] lower, double[] upper)
+    {
+        int n = actual.Length;
+        var xs = Enumerable.Range(1, n).Select(i => (double)i).ToArray();
+        var act = p.Add.Scatter(xs, actual);
+        act.Color = Accent; act.MarkerSize = 4; act.LineWidth = 1.5f; act.LegendText = "Actual";
+
+        if (forecasts.Length > 0)
+        {
+            var fxs = Enumerable.Range(n + 1, forecasts.Length).Select(i => (double)i).ToArray();
+            var band = p.Add.Scatter(fxs, upper);
+            band.Color = Color.FromHex("#ED5565"); band.MarkerSize = 0; band.LineWidth = 1; band.LinePattern = LinePattern.Dotted; band.LegendText = "95% CI";
+            var bandLo = p.Add.Scatter(fxs, lower);
+            bandLo.Color = Color.FromHex("#ED5565"); bandLo.MarkerSize = 0; bandLo.LineWidth = 1; bandLo.LinePattern = LinePattern.Dotted;
+            var fc = p.Add.Scatter(fxs, forecasts);
+            fc.Color = Color.FromHex("#A0D468"); fc.MarkerSize = 5; fc.LineWidth = 2; fc.LinePattern = LinePattern.Dashed; fc.LegendText = "Forecast";
+        }
+        p.ShowLegend();
+        p.Title($"ARIMA Forecast of {name}");
+        p.XLabel("Period"); p.YLabel(name);
+    }
+
     public static void Acf(Plot p, string title, double[] values, int n, string yLabel)
     {
         var bars = new List<Bar>();

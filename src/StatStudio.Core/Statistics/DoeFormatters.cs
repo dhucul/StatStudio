@@ -23,6 +23,20 @@ public static class DoeFormatters
                "Estimated Effects and Coefficients (coded units)\n" + t + "\n\n" + model + note;
     }
 
+    public static string Fractional(FractionalDesign d)
+    {
+        int pp = d.Factors - (int)Math.Round(Math.Log2(d.Runs));
+        return $"Created 2^({d.Factors}-{pp}) fractional factorial: {d.Runs} runs, Resolution {Roman(d.Resolution)}.\n" +
+               $"Generators: {string.Join(", ", d.Generators)}\n" +
+               $"Defining relation: {d.DefiningRelation}\n" +
+               $"Factors {string.Join(", ", d.FactorNames)} written to the worksheet (coded ±1).";
+    }
+
+    private static string Roman(int n) => n switch
+    {
+        2 => "II", 3 => "III", 4 => "IV", 5 => "V", 6 => "VI", 7 => "VII", _ => n.ToString(),
+    };
+
     public static string Design(FactorialDesign d) =>
         $"Created full factorial design: {d.Factors} factors, {d.Runs} runs " +
         $"({d.Replicates} replicate(s){(d.CenterPoints > 0 ? $", {d.CenterPoints} center point(s)/replicate" : "")}). " +

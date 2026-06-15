@@ -61,6 +61,14 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-arima":
+                    var aser = Enumerable.Range(0, 40).Select(tt => 50 + 1.5 * tt + 6 * Math.Sin(tt * Math.PI / 6)
+                        + 3 * Math.Sin(tt * 0.9)).ToArray();
+                    var ar = Arima.Fit(aser, 2, 1, 1, 8, includeConstant: true);
+                    OutputRaw(TimeSeriesFormatters.Arima(ar, "Series"));
+                    ShowGraph("ARIMA Forecast of Series",
+                        pp => Plots.ForecastPlot(pp, "Series", aser, ar.Forecasts, ar.ForecastLower, ar.ForecastUpper));
+                    break;
                 case "--shot-gagerr":
                     var gm = new double[] { 10, 12, 11, 13, 20, 22, 21, 23 };
                     var gp = new[] { "P1", "P1", "P1", "P1", "P2", "P2", "P2", "P2" };
@@ -710,6 +718,27 @@ public partial class MainWindow : Window
         Log(DoeFormatters.Design(design));
     }
 
+    private void OnCreateFractional(object sender, RoutedEventArgs e)
+    {
+        var dlg = new FractionalCreateWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var design = DoeDesign.FractionalFactorial(dlg.Factors, dlg.Runs, dlg.Randomize);
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+
+        var ws = new CoreData.Worksheet { Name = $"FracFactorial_{dlg.Factors}f{dlg.Runs}r" };
+        var so = ws.AddColumn("StdOrder");
+        var ro = ws.AddColumn("RunOrder");
+        var fcols = design.FactorNames.Select(fn => ws.AddColumn(fn)).ToList();
+        foreach (var run in design.RunList)
+        {
+            so.Add(run.StdOrder.ToString());
+            ro.Add(run.RunOrder.ToString());
+            for (int j = 0; j < fcols.Count; j++) fcols[j].Add(run.Factors[j].ToString(inv));
+        }
+        LoadWorksheet(ws);
+        Log(DoeFormatters.Fractional(design));
+    }
+
     private void OnAnalyzeFactorial(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
@@ -827,6 +856,24 @@ public partial class MainWindow : Window
         var r = TimeSeries.Decompose(v, dlg.Period, dlg.Multiplicative);
         OutputRaw(TimeSeriesFormatters.Decomposition(r, name));
         ShowGraph($"Decomposition of {name} (trend)", p => Plots.TimeSeriesFit(p, name, v, r.Trend, Array.Empty<double>()));
+    }
+
+    private void OnArima(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new ArimaWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
+        try
+        {
+            var r = Arima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.Forecasts, dlg.IncludeConstant);
+            OutputRaw(TimeSeriesFormatters.Arima(r, dlg.SeriesColumn));
+            if (r.Forecasts.Length > 0)
+                ShowGraph($"ARIMA Forecast of {dlg.SeriesColumn}",
+                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
+        }
+        catch (Exception ex) { Log($"ARIMA: {ex.Message}"); }
     }
 
     private void OnAcf(object sender, RoutedEventArgs e) => RunAcf(false);

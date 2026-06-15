@@ -69,6 +69,8 @@
                     <MenuItem Header="_Decomposition…" Click="OnDecomposition"/>
                     <MenuItem Header="_Autocorrelation (ACF)…" Click="OnAcf"/>
                     <MenuItem Header="_Partial Autocorrelation (PACF)…" Click="OnPacf"/>
+                    <Separator/>
+                    <MenuItem Header="A_RIMA…" Click="OnArima"/>
                 </MenuItem>
                 <MenuItem Header="_Multivariate">
                     <MenuItem Header="_Principal Components…" Click="OnPca"/>
@@ -76,6 +78,7 @@
                 </MenuItem>
                 <MenuItem Header="_DOE">
                     <MenuItem Header="_Create Factorial Design…" Click="OnCreateFactorial"/>
+                    <MenuItem Header="Create _Fractional Factorial…" Click="OnCreateFractional"/>
                     <MenuItem Header="_Analyze Factorial Design…" Click="OnAnalyzeFactorial"/>
                 </MenuItem>
                 <MenuItem Header="Po_wer and Sample Size…" Click="OnPowerSampleSize"/>

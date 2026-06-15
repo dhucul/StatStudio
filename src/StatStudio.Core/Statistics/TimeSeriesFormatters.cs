@@ -44,6 +44,32 @@ public static class TimeSeriesFormatters
                "Seasonal Indices\n" + t;
     }
 
+    public static string Arima(ArimaResult r, string name)
+    {
+        var t = new TextTable("Type", "Coef", "SE Coef", "T-Value", "P-Value").LeftAlign(0);
+        foreach (var term in r.Terms)
+            t.Add(term.Name, Fmt.N(term.Coef, 4),
+                double.IsNaN(term.Se) ? "*" : Fmt.N(term.Se, 4),
+                double.IsNaN(term.T) ? "*" : Fmt.N(term.T, 2),
+                double.IsNaN(term.P) ? "*" : Fmt.P(term.P));
+
+        var summary = new TextTable("Sigma^2", "Log-Likelihood", "AIC");
+        summary.Add(Fmt.N(r.Sigma2, 4), Fmt.N(r.LogLikelihood, 2), Fmt.N(r.Aic, 2));
+
+        string fc = "";
+        if (r.Forecasts.Length > 0)
+        {
+            var f = new TextTable("Period", "Forecast", "Lower 95%", "Upper 95%");
+            for (int i = 0; i < r.Forecasts.Length; i++)
+                f.Add((r.N + i + 1).ToString(), Fmt.N(r.Forecasts[i]), Fmt.N(r.ForecastLower[i]), Fmt.N(r.ForecastUpper[i]));
+            fc = "\n\nForecasts\n" + f;
+        }
+
+        return $"ARIMA({r.P},{r.D},{r.Q}) Model: {name}\n\n" +
+               "Final Estimates of Parameters\n" + t + "\n\n" +
+               "Model Summary\n" + summary + fc;
+    }
+
     public static string Acf(AcfResult r, string name, bool partial)
     {
         var vals = partial ? r.Pacf : r.Acf;
