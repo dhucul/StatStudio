@@ -61,6 +61,26 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-gagerr":
+                    var gm = new double[] { 10, 12, 11, 13, 20, 22, 21, 23 };
+                    var gp = new[] { "P1", "P1", "P1", "P1", "P2", "P2", "P2", "P2" };
+                    var go = new[] { "O1", "O1", "O2", "O2", "O1", "O1", "O2", "O2" };
+                    var gr = GageRR.Analyze(gm, gp, go);
+                    OutputRaw(DoeFormatters.GageRR(gr));
+                    break;
+                case "--shot-doe":
+                    var dA = new double[] { -1, -1, 1, 1, -1, -1, 1, 1 };
+                    var dB = new double[] { -1, 1, -1, 1, -1, 1, -1, 1 };
+                    var dnz = new double[] { 0.2, -0.2, 0.1, -0.1, -0.2, 0.2, -0.1, 0.1 };
+                    var dY = new double[8];
+                    for (int q = 0; q < 8; q++) dY[q] = 10 + 3 * dA[q] + 2 * dB[q] + 1 * dA[q] * dB[q] + dnz[q];
+                    var dr = FactorialAnalysis.Analyze(dY, new[] { dA, dB }, new[] { "A", "B" }, "Y");
+                    OutputRaw(DoeFormatters.Factorial(dr));
+                    var de = dr.Terms.Where(t => t.Name != "Constant")
+                        .OrderByDescending(t => Math.Abs(double.IsNaN(t.T) ? t.Effect : t.T)).ToList();
+                    ShowGraph("Pareto of Effects", p => Plots.LabeledBars(p, "Pareto of Effects", "Term", "|Standardized effect|",
+                        de.Select(t => t.Name).ToList(), de.Select(t => Math.Abs(double.IsNaN(t.T) ? t.Effect : t.T)).ToList()));
+                    break;
                 case "--shot-pca": var wp = BuildDemo();
                     var pcaCols = new[] { wp.Find("Height")!, wp.Find("Weight")! };
                     var pcaRows = Columns.Rows(pcaCols).ToArray();
@@ -663,6 +683,72 @@ public partial class MainWindow : Window
             }
         }
         OutputRaw(MultivariateFormatters.Power(test, solveFor, dlg.Alpha, dlg.Alt, effectDesc, n, power));
+    }
+
+    // ---- DOE & Gage R&R ----------------------------------------------------
+
+    private void OnCreateFactorial(object sender, RoutedEventArgs e)
+    {
+        var dlg = new DoeCreateWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var design = DoeDesign.FullFactorial(dlg.Factors, dlg.Replicates, dlg.CenterPoints, dlg.Randomize);
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+
+        var ws = new CoreData.Worksheet { Name = $"FactorialDesign_{dlg.Factors}f" };
+        var so = ws.AddColumn("StdOrder");
+        var ro = ws.AddColumn("RunOrder");
+        var cp = ws.AddColumn("CenterPt");
+        var fcols = design.FactorNames.Select(fn => ws.AddColumn(fn)).ToList();
+        foreach (var run in design.RunList)
+        {
+            so.Add(run.StdOrder.ToString());
+            ro.Add(run.RunOrder.ToString());
+            cp.Add(run.CenterPt.ToString());
+            for (int j = 0; j < fcols.Count; j++) fcols[j].Add(run.Factors[j].ToString(inv));
+        }
+        LoadWorksheet(ws);
+        Log(DoeFormatters.Design(design));
+    }
+
+    private void OnAnalyzeFactorial(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Analyze Factorial Design" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length < 4) { Log("Need at least 4 complete runs."); return; }
+        try
+        {
+            var r = FactorialAnalysis.Analyze(y, x, dlg.Predictors, dlg.Response);
+            OutputRaw(DoeFormatters.Factorial(r));
+            var effects = r.Terms.Where(t => t.Name != "Constant")
+                .OrderByDescending(t => Math.Abs(double.IsNaN(t.T) ? t.Effect : t.T)).ToList();
+            string yl = r.DfError > 0 ? "|Standardized effect|" : "|Effect|";
+            ShowGraph("Pareto of Effects", p => Plots.LabeledBars(p, "Pareto of Effects", "Term", yl,
+                effects.Select(t => t.Name).ToList(),
+                effects.Select(t => Math.Abs(double.IsNaN(t.T) ? t.Effect : t.T)).ToList()));
+        }
+        catch (Exception ex) { Log($"Factorial analysis: {ex.Message}"); }
+    }
+
+    private void OnGageRR(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var all = ws.Columns.Select(c => c.Name).ToList();
+        var dlg = new TwoWayAnovaWindow(numeric, all) { Owner = this, Title = "Gage R&R (Crossed) — Response, Part, Operator" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, part, op) = Columns.Factorial(ws.Find(dlg.Response)!, ws.Find(dlg.FactorA)!, ws.Find(dlg.FactorB)!);
+        try
+        {
+            var g = GageRR.Analyze(y, part, op);
+            OutputRaw(DoeFormatters.GageRR(g));
+            var comps = g.Components.Where(c => c.Source.Trim() != "Total Variation").ToList();
+            ShowGraph("Gage R&R Components", p => Plots.LabeledBars(p, "Gage R&R — % Study Var", "Source", "% Study Var",
+                comps.Select(c => c.Source.Trim()).ToList(), comps.Select(c => c.PctStudyVar).ToList()));
+        }
+        catch (Exception ex) { Log($"Gage R&R: {ex.Message}"); }
     }
 
     // ---- Time series -------------------------------------------------------

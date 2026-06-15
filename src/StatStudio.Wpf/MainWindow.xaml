@@ -74,6 +74,10 @@
                     <MenuItem Header="_Principal Components…" Click="OnPca"/>
                     <MenuItem Header="Cluster _K-Means…" Click="OnKMeans"/>
                 </MenuItem>
+                <MenuItem Header="_DOE">
+                    <MenuItem Header="_Create Factorial Design…" Click="OnCreateFactorial"/>
+                    <MenuItem Header="_Analyze Factorial Design…" Click="OnAnalyzeFactorial"/>
+                </MenuItem>
                 <MenuItem Header="Po_wer and Sample Size…" Click="OnPowerSampleSize"/>
                 <MenuItem Header="_Control Charts">
                     <MenuItem Header="Xbar-_R…" Click="OnXbarR"/>
@@ -87,6 +91,7 @@
                 </MenuItem>
                 <MenuItem Header="_Quality Tools">
                     <MenuItem Header="_Capability Analysis (Normal)…" Click="OnCapability"/>
+                    <MenuItem Header="_Gage R&amp;R (Crossed)…" Click="OnGageRR"/>
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="_Graph">

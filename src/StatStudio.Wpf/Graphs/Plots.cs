@@ -235,6 +235,24 @@ internal static class Plots
         p.Title(title); p.XLabel("Lag"); p.YLabel(yLabel);
     }
 
+    public static void LabeledBars(Plot p, string title, string xLabel, string yLabel,
+        IReadOnlyList<string> labels, IReadOnlyList<double> values)
+    {
+        var bars = new List<Bar>();
+        var ticks = new List<Tick>();
+        for (int i = 0; i < values.Count; i++)
+        {
+            bars.Add(new Bar { Position = i, Value = values[i], Size = 0.7, FillColor = Accent, LineWidth = 0 });
+            ticks.Add(new Tick(i, labels[i]));
+        }
+        p.Add.Bars(bars);
+        p.Axes.Bottom.TickGenerator = new ScottPlot.TickGenerators.NumericManual(ticks.ToArray());
+        p.Title(title);
+        p.XLabel(xLabel);
+        p.YLabel(yLabel);
+        p.Axes.Margins(bottom: 0);
+    }
+
     public static void Scree(Plot p, double[] eigenvalues)
     {
         var xs = Enumerable.Range(1, eigenvalues.Length).Select(i => (double)i).ToArray();

@@ -18,8 +18,11 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
 - **Time series** — trend analysis, moving average, single/double/Winters exponential smoothing,
   classical decomposition, ACF/PACF; with MAPE/MAD/MSD accuracy and actual/fitted/forecast plots.
 - **Multivariate** — principal components (scree plot), k-means clustering.
+- **DOE** — create full 2^k factorial designs (replicates, center points, randomized run order);
+  analyze 2-level factorials (effects, coefficients, ANOVA, Pareto of effects).
 - **Control charts (SPC)** — Xbar-R, Xbar-S, I-MR, P, NP, C, U (with Nelson tests 1 & 2).
-- **Quality & DOE-adjacent** — normal process capability (Cp, Cpk, Pp, Ppk, Cpm); power & sample-size
+- **Quality tools** — normal process capability (Cp, Cpk, Pp, Ppk, Cpm); crossed **Gage R&R**
+  (ANOVA method: variance components, %study var, distinct categories); power & sample-size
   calculators (1-/2-sample t, 1-proportion).
 - **Graphs** — histogram, boxplot, scatterplot, time-series plot, normal probability plot.
 
@@ -42,7 +45,7 @@ that is converted to a Core `Worksheet` whenever an analysis runs.
 ```
 dotnet build StatStudio.slnx
 dotnet run  --project src/StatStudio.Wpf
-dotnet run  --project tools/StatStudio.Smoke      # 192 numeric checks vs reference values
+dotnet run  --project tools/StatStudio.Smoke      # 210 numeric checks vs reference values
 ```
 
 `StatStudio.Wpf --demo` loads a sample dataset and runs a few analyses (see `ProcessArgs` for the
@@ -59,6 +62,6 @@ Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
 
 ## Not yet included
 
-Designed experiments (factorial/RSM), ARIMA, factor analysis, reliability/survival, Gage R&R,
+Fractional/response-surface/mixture designs, ARIMA, factor analysis, reliability/survival,
 and a worksheet calculator language. The engine-per-analysis + dialog + Session-output design
 makes these additive.
