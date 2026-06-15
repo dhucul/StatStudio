@@ -68,6 +68,10 @@ public partial class MainWindow : Window
                         ("Method B", wa.Find("Method B")!.NumericValues()),
                         ("Method C", wa.Find("Method C")!.NumericValues()),
                     }), "Method", "Yield")); break;
+                case "--shot-menu":
+                    StatMenu.IsSubmenuOpen = true;
+                    if (StatMenu.Items.Count > 0 && StatMenu.Items[0] is MenuItem first) first.IsSubmenuOpen = true;
+                    break;
                 case "--data" when i + 1 < args.Length:
                     try { LoadWorksheet(CoreData.WorksheetIo.ReadCsv(args[++i])); }
                     catch (Exception ex) { Log("data load failed: " + ex.Message); }

@@ -91,21 +91,113 @@
         <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}"/>
     </Style>
 
-    <!-- Menu -->
+    <!-- Menu (dark, with fully dark dropdown popups so submenu text stays readable) -->
+    <ControlTemplate x:Key="SS.TopLevelHeader" TargetType="MenuItem">
+        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="9,4">
+            <Grid>
+                <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
+                       IsOpen="{TemplateBinding IsSubmenuOpen}" Placement="Bottom" PopupAnimation="Fade">
+                    <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1" Padding="2">
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </Border>
+                </Popup>
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Selection}"/>
+            </Trigger>
+            <Trigger Property="IsSubmenuOpen" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Selection}"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="SS.TopLevelItem" TargetType="MenuItem">
+        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="9,4">
+            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Selection}"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="SS.SubmenuItem" TargetType="MenuItem">
+        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="8,4" SnapsToDevicePixels="True">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ContentPresenter Grid.Column="0" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{TemplateBinding InputGestureText}" Foreground="#808080"
+                           Margin="24,0,0,0" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Selection}"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="#6A6A6A"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key="SS.SubmenuHeader" TargetType="MenuItem">
+        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="8,4" SnapsToDevicePixels="True">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ContentPresenter Grid.Column="0" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                <Path Grid.Column="1" Data="M0,0 L4,4 L0,8 Z" Fill="#D4D4D4" Margin="24,0,0,0" VerticalAlignment="Center"/>
+                <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
+                       IsOpen="{TemplateBinding IsSubmenuOpen}" Placement="Right" PopupAnimation="Fade">
+                    <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1" Padding="2">
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </Border>
+                </Popup>
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Selection}"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
     <Style TargetType="Menu">
         <Setter Property="Background" Value="{StaticResource PanelAlt}"/>
         <Setter Property="Foreground" Value="{StaticResource Text}"/>
     </Style>
     <Style TargetType="MenuItem">
         <Setter Property="Foreground" Value="{StaticResource Text}"/>
+        <Setter Property="Background" Value="Transparent"/>
         <Style.Triggers>
-            <Trigger Property="IsHighlighted" Value="True">
-                <Setter Property="Background" Value="{StaticResource Selection}"/>
+            <Trigger Property="Role" Value="TopLevelHeader">
+                <Setter Property="Template" Value="{StaticResource SS.TopLevelHeader}"/>
+            </Trigger>
+            <Trigger Property="Role" Value="TopLevelItem">
+                <Setter Property="Template" Value="{StaticResource SS.TopLevelItem}"/>
+            </Trigger>
+            <Trigger Property="Role" Value="SubmenuHeader">
+                <Setter Property="Template" Value="{StaticResource SS.SubmenuHeader}"/>
+            </Trigger>
+            <Trigger Property="Role" Value="SubmenuItem">
+                <Setter Property="Template" Value="{StaticResource SS.SubmenuItem}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
     <Style TargetType="Separator">
         <Setter Property="Background" Value="{StaticResource PanelBorder}"/>
+        <Setter Property="Margin" Value="0,3"/>
     </Style>
 
     <!-- Status bar -->

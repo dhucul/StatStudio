@@ -15,7 +15,7 @@
                 <Separator/>
                 <MenuItem Header="E_xit" Click="OnExit"/>
             </MenuItem>
-            <MenuItem Header="_Stat">
+            <MenuItem Header="_Stat" x:Name="StatMenu">
                 <MenuItem Header="_Basic Statistics">
                     <MenuItem Header="_Display Descriptive Statistics…" Click="OnDescriptives"/>
                     <Separator/>
