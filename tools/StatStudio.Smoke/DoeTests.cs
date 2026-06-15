@@ -44,6 +44,35 @@ internal static class DoeTests
         Check.Close(T("AB").Effect, 2, "effect AB");
         Check.Close(T("A").Coef, 3, "coef A");
 
+        Check.Section("RSM — central composite design (k=2)");
+        var ccd = ResponseSurface.CentralComposite(2, centerPoints: 3, faceCentered: false, randomize: false);
+        Check.Equal(ccd.Runs, 11, "runs = 4 cube + 4 axial + 3 center");
+        Check.Close(ccd.Alpha, Math.Sqrt(2), "alpha = 2^(1/2) (rotatable)", 1e-6);
+        Check.True(ccd.RunList.Any(r => Math.Abs(r.Factors[0] - ccd.Alpha) < 1e-9 && Math.Abs(r.Factors[1]) < 1e-9),
+            "an axial point at (+alpha, 0) exists");
+
+        Check.Section("RSM — Box-Behnken (k=3)");
+        var bbd = ResponseSurface.BoxBehnken(3, centerPoints: 3, randomize: false);
+        Check.Equal(bbd.Runs, 15, "runs = 3 pairs × 4 + 3 center");
+        Check.True(bbd.RunList.Where(r => r.PointType == "Edge").All(r => r.Factors.Count(v => v == 0) == 1),
+            "each edge point has exactly one factor at 0");
+
+        Check.Section("RSM — analyze quadratic (exact recovery)");
+        var cube = ResponseSurface.CentralComposite(2, centerPoints: 3, faceCentered: false, randomize: false);
+        var ca = cube.RunList.Select(r => r.Factors[0]).ToArray();
+        var cb = cube.RunList.Select(r => r.Factors[1]).ToArray();
+        var cy = new double[ca.Length];
+        for (int i = 0; i < cy.Length; i++)
+            cy[i] = 5 + 2 * ca[i] + 3 * cb[i] + 1 * ca[i] * ca[i] + 0.5 * cb[i] * cb[i] + 1.5 * ca[i] * cb[i];
+        var rsm = ResponseSurface.Analyze(cy, new[] { ca, cb }, new[] { "A", "B" });
+        RegressionTerm RT(string n) => rsm.Terms.First(t => t.Name == n);
+        Check.Close(RT("Constant").Coef, 5, "b0");
+        Check.Close(RT("A").Coef, 2, "linear A");
+        Check.Close(RT("B").Coef, 3, "linear B");
+        Check.Close(RT("A*A").Coef, 1, "square A");
+        Check.Close(RT("B*B").Coef, 0.5, "square B");
+        Check.Close(RT("A*B").Coef, 1.5, "interaction A*B");
+
         Check.Section("Gage R&R (2 parts × 2 operators × 2 reps)");
         var meas = new double[] { 10, 12, 11, 13, 20, 22, 21, 23 };
         var parts = new[] { "P1", "P1", "P1", "P1", "P2", "P2", "P2", "P2" };

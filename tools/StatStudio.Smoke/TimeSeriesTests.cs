@@ -75,5 +75,19 @@ internal static class TimeSeriesTests
         var ma1 = Arima.Fit(noisy, 0, 0, 1);
         Check.True(double.IsFinite(ma1.Terms.First(t => t.Name == "MA(1)").Coef), "MA(1) coef finite");
         Check.True(ma1.Sigma2 > 0, "residual variance positive");
+
+        Check.Section("SARIMA(0,0,0)(0,1,0)_4 — seasonal differencing repeats the season");
+        var seas = new double[12];
+        var pat4 = new double[] { 10, 20, 30, 40 };
+        for (int t = 0; t < 12; t++) seas[t] = pat4[t % 4];
+        var sar = Sarima.Fit(seas, 0, 0, 0, 0, 1, 0, 4, forecasts: 4, includeConstant: false);
+        Check.Close(sar.Forecasts[0], 10, "forecast season 1", 1e-6);
+        Check.Close(sar.Forecasts[1], 20, "forecast season 2", 1e-6);
+        Check.Close(sar.Forecasts[2], 30, "forecast season 3", 1e-6);
+        Check.Close(sar.Forecasts[3], 40, "forecast season 4", 1e-6);
+
+        Check.Section("SARIMA(1,0,0)(0,0,0)_1 reduces to AR(1)");
+        var sar2 = Sarima.Fit(line, 1, 0, 0, 0, 0, 0, 1);
+        Check.Close(sar2.Terms.First(t => t.Name == "AR(1)").Coef, 1.0, "AR(1) ~ 1", 0.05);
     }
 }

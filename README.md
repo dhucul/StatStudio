@@ -16,12 +16,13 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
 - **Regression** — simple, multiple, polynomial, best-subsets (Mallows Cp), stepwise, and binary
   logistic; coefficient SE/t/p, R²/adj-R²/S, ANOVA table, fitted-line and residual plots.
 - **Time series** — trend analysis, moving average, single/double/Winters exponential smoothing,
-  classical decomposition, ACF/PACF, **ARIMA(p,d,q)** (forecasts with confidence bands);
-  MAPE/MAD/MSD accuracy and actual/fitted/forecast plots.
+  classical decomposition, ACF/PACF, **ARIMA(p,d,q)** and **seasonal SARIMA(p,d,q)(P,D,Q)ₛ**
+  (forecasts with confidence bands); MAPE/MAD/MSD accuracy and actual/fitted/forecast plots.
 - **Multivariate** — principal components (scree plot), k-means clustering.
 - **DOE** — create full 2^k and 2^(k-p) fractional factorial designs (generators, resolution,
-  defining relation, replicates, center points, randomized run order); analyze 2-level
-  factorials (effects, coefficients, ANOVA, Pareto of effects).
+  defining relation, replicates, center points, randomized run order) and **response-surface
+  designs** (central composite + Box-Behnken); analyze 2-level factorials (effects, ANOVA,
+  Pareto) and second-order response surfaces (full quadratic model).
 - **Control charts (SPC)** — Xbar-R, Xbar-S, I-MR, P, NP, C, U (with Nelson tests 1 & 2).
 - **Quality tools** — normal process capability (Cp, Cpk, Pp, Ppk, Cpm); crossed **Gage R&R**
   (ANOVA method: variance components, %study var, distinct categories); power & sample-size
@@ -47,7 +48,7 @@ that is converted to a Core `Worksheet` whenever an analysis runs.
 ```
 dotnet build StatStudio.slnx
 dotnet run  --project src/StatStudio.Wpf
-dotnet run  --project tools/StatStudio.Smoke      # 225 numeric checks vs reference values
+dotnet run  --project tools/StatStudio.Smoke      # 241 numeric checks vs reference values
 ```
 
 `StatStudio.Wpf --demo` loads a sample dataset and runs a few analyses (see `ProcessArgs` for the
@@ -64,6 +65,5 @@ Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
 
 ## Not yet included
 
-Response-surface/mixture designs, seasonal ARIMA (SARIMA), factor analysis, reliability/survival,
-and a worksheet calculator language. The engine-per-analysis + dialog + Session-output design
-makes these additive.
+Mixture designs, factor analysis, reliability/survival, and a worksheet calculator language.
+The engine-per-analysis + dialog + Session-output design makes these additive.

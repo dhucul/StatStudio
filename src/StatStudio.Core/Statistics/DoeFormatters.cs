@@ -32,6 +32,14 @@ public static class DoeFormatters
                $"Factors {string.Join(", ", d.FactorNames)} written to the worksheet (coded ±1).";
     }
 
+    public static string Rsm(RsmDesign d)
+    {
+        string alpha = d.Type.StartsWith("Central") ? $", axial α = {d.Alpha:0.####}" : "";
+        var pts = d.RunList.GroupBy(r => r.PointType).Select(g => $"{g.Count()} {g.Key.ToLower()}");
+        return $"Created {d.Type} design: {d.Factors} factors, {d.Runs} runs ({string.Join(", ", pts)}){alpha}.\n" +
+               $"Factors {string.Join(", ", d.FactorNames)} and a PtType column written to the worksheet.";
+    }
+
     private static string Roman(int n) => n switch
     {
         2 => "II", 3 => "III", 4 => "IV", 5 => "V", 6 => "VI", 7 => "VII", _ => n.ToString(),

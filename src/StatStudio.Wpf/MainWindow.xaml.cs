@@ -61,6 +61,14 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-sarima":
+                    var sser = Enumerable.Range(0, 48).Select(tt => 100 + 0.8 * tt
+                        + 15 * Math.Sin(tt * 2 * Math.PI / 12) + 4 * Math.Sin(tt * 0.7)).ToArray();
+                    var sr = Sarima.Fit(sser, 1, 1, 1, 0, 1, 1, 12, 12, includeConstant: false);
+                    OutputRaw(TimeSeriesFormatters.Sarima(sr, "Monthly"));
+                    ShowGraph("SARIMA Forecast of Monthly",
+                        pp => Plots.ForecastPlot(pp, "Monthly", sser, sr.Forecasts, sr.ForecastLower, sr.ForecastUpper));
+                    break;
                 case "--shot-arima":
                     var aser = Enumerable.Range(0, 40).Select(tt => 50 + 1.5 * tt + 6 * Math.Sin(tt * Math.PI / 6)
                         + 3 * Math.Sin(tt * 0.9)).ToArray();
@@ -739,6 +747,50 @@ public partial class MainWindow : Window
         Log(DoeFormatters.Fractional(design));
     }
 
+    private void OnCreateRsm(object sender, RoutedEventArgs e)
+    {
+        var dlg = new RsmCreateWindow { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var design = dlg.IsBoxBehnken
+            ? ResponseSurface.BoxBehnken(dlg.Factors, dlg.CenterPoints, dlg.Randomize)
+            : ResponseSurface.CentralComposite(dlg.Factors, dlg.CenterPoints, dlg.FaceCentered, dlg.Randomize);
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+
+        var ws = new CoreData.Worksheet { Name = dlg.IsBoxBehnken ? $"BoxBehnken_{dlg.Factors}f" : $"CCD_{dlg.Factors}f" };
+        var so = ws.AddColumn("StdOrder");
+        var ro = ws.AddColumn("RunOrder");
+        var pt = ws.AddColumn("PtType", CoreData.ColumnType.Text);
+        var fcols = design.FactorNames.Select(fn => ws.AddColumn(fn)).ToList();
+        foreach (var run in design.RunList)
+        {
+            so.Add(run.StdOrder.ToString());
+            ro.Add(run.RunOrder.ToString());
+            pt.Add(run.PointType);
+            for (int j = 0; j < fcols.Count; j++) fcols[j].Add(run.Factors[j].ToString("0.#####", inv));
+        }
+        LoadWorksheet(ws);
+        Log(DoeFormatters.Rsm(design));
+    }
+
+    private void OnAnalyzeRsm(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Analyze Response Surface (quadratic)" };
+        if (dlg.ShowDialog() != true) return;
+        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (x.Length < 2) { Log("Select at least two factors."); return; }
+        int terms = 1 + 2 * x.Length + x.Length * (x.Length - 1) / 2;
+        if (y.Length <= terms) { Log($"Need more than {terms} complete runs for a quadratic model in {x.Length} factors."); return; }
+        try
+        {
+            var r = ResponseSurface.Analyze(y, x, dlg.Predictors, dlg.Response);
+            OutputRaw("Response Surface Regression (full quadratic model)\n\n" + RegressionFormatter.Format(r));
+            ShowGraph("Residuals vs Fitted", p => Plots.ResidualVsFitted(p, r.Fitted, r.Residuals));
+        }
+        catch (Exception ex) { Log($"Response surface: {ex.Message}"); }
+    }
+
     private void OnAnalyzeFactorial(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
@@ -874,6 +926,24 @@ public partial class MainWindow : Window
                     p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
         }
         catch (Exception ex) { Log($"ARIMA: {ex.Message}"); }
+    }
+
+    private void OnSarima(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new SarimaWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
+        try
+        {
+            var r = Sarima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.SP, dlg.SD, dlg.SQ, dlg.Season, dlg.Forecasts, dlg.IncludeConstant);
+            OutputRaw(TimeSeriesFormatters.Sarima(r, dlg.SeriesColumn));
+            if (r.Forecasts.Length > 0)
+                ShowGraph($"SARIMA Forecast of {dlg.SeriesColumn}",
+                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
+        }
+        catch (Exception ex) { Log($"SARIMA: {ex.Message}"); }
     }
 
     private void OnAcf(object sender, RoutedEventArgs e) => RunAcf(false);
