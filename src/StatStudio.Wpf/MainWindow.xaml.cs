@@ -61,6 +61,15 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-reliability":
+                    int rn = 30;
+                    var wt = new double[rn];
+                    for (int q = 1; q <= rn; q++) { double pr = (q - 0.3) / (rn + 0.4); wt[q - 1] = 100 * Math.Pow(-Math.Log(1 - pr), 0.5); }
+                    var wfit = Reliability.FitWeibull(wt);
+                    OutputRaw(ReliabilityFormatters.DistributionFit(wfit, "Life"));
+                    ShowGraph("Weibull Plot of Life",
+                        pp => Plots.WeibullPlot(pp, "Life", wt, wfit.Parameters[0].Value, wfit.Parameters[1].Value));
+                    break;
                 case "--shot-sarima":
                     var sser = Enumerable.Range(0, 48).Select(tt => 100 + 0.8 * tt
                         + 15 * Math.Sin(tt * 2 * Math.PI / 12) + 4 * Math.Sin(tt * 0.7)).ToArray();
@@ -662,6 +671,81 @@ public partial class MainWindow : Window
                     p => Plots.ClusterScatter(p, dlg.SelectedColumns[0], dlg.SelectedColumns[1], rows.ToArray(), r.Assignments, r.K));
         }
         catch (Exception ex) { Log($"K-Means: {ex.Message}"); }
+    }
+
+    private void OnFactorAnalysis(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 2, out var numeric)) return;
+        var dlg = new FactorWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var rows = Columns.Rows(cols);
+        if (rows.Count < 2) { Log("Not enough complete rows."); return; }
+        try
+        {
+            var r = FactorAnalysis.Extract(rows.ToArray(), dlg.SelectedColumns, dlg.NumFactors, dlg.Varimax);
+            OutputRaw(MultivariateFormatters.FactorAnalysis(r));
+        }
+        catch (Exception ex) { Log($"Factor analysis: {ex.Message}"); }
+    }
+
+    private void OnDistFit(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new DistFitWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+        var t = ws.Find(dlg.TimesColumn)!.NumericValues();
+        if (t.Length < 3) { Log("Need at least 3 observations."); return; }
+        if (dlg.Distribution != "Normal" && t.Any(v => v <= 0))
+        { Log($"{dlg.Distribution} requires all times > 0."); return; }
+        try
+        {
+            var fit = dlg.Distribution switch
+            {
+                "Exponential" => Reliability.FitExponential(t),
+                "Lognormal" => Reliability.FitLognormal(t),
+                "Normal" => Reliability.FitNormal(t),
+                _ => Reliability.FitWeibull(t),
+            };
+            OutputRaw(ReliabilityFormatters.DistributionFit(fit, dlg.TimesColumn));
+            if (dlg.Distribution == "Weibull")
+            {
+                double beta = fit.Parameters[0].Value, eta = fit.Parameters[1].Value;
+                ShowGraph($"Weibull Plot of {dlg.TimesColumn}", p => Plots.WeibullPlot(p, dlg.TimesColumn, t, beta, eta));
+            }
+            else ShowGraph($"Histogram of {dlg.TimesColumn}", p => Plots.Histogram(p, dlg.TimesColumn, t));
+        }
+        catch (Exception ex) { Log($"Distribution analysis: {ex.Message}"); }
+    }
+
+    private void OnKaplanMeier(object sender, RoutedEventArgs e)
+    {
+        var ws = CurrentWorksheet();
+        if (!RequireNumeric(ws, 1, out var numeric)) return;
+        var dlg = new KaplanMeierWindow(numeric) { Owner = this };
+        if (dlg.ShowDialog() != true) return;
+
+        double[] times;
+        bool[] censored;
+        if (dlg.CensorColumn is null)
+        {
+            times = ws.Find(dlg.TimesColumn)!.NumericValues();
+            censored = new bool[times.Length];
+        }
+        else
+        {
+            var (tv, cv) = Columns.Pairwise(ws.Find(dlg.TimesColumn)!, ws.Find(dlg.CensorColumn)!);
+            times = tv;
+            censored = cv.Select(v => v == 1).ToArray();
+        }
+        if (times.Length < 2) { Log("Need at least 2 observations."); return; }
+        var km = Reliability.KaplanMeier(times, censored);
+        OutputRaw(ReliabilityFormatters.KaplanMeier(km, dlg.TimesColumn));
+        ShowGraph($"Kaplan-Meier Survival of {dlg.TimesColumn}",
+            p => Plots.StepSurvival(p, dlg.TimesColumn, km.Rows.Select(r => r.Time).ToArray(),
+                km.Rows.Select(r => r.Survival).ToArray()));
     }
 
     private void OnPowerSampleSize(object sender, RoutedEventArgs e)

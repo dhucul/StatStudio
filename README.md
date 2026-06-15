@@ -18,7 +18,10 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
 - **Time series** — trend analysis, moving average, single/double/Winters exponential smoothing,
   classical decomposition, ACF/PACF, **ARIMA(p,d,q)** and **seasonal SARIMA(p,d,q)(P,D,Q)ₛ**
   (forecasts with confidence bands); MAPE/MAD/MSD accuracy and actual/fitted/forecast plots.
-- **Multivariate** — principal components (scree plot), k-means clustering.
+- **Multivariate** — principal components (scree plot), factor analysis (varimax rotation),
+  k-means clustering.
+- **Reliability / survival** — parametric life-data fitting (Weibull/exponential/lognormal/normal
+  MLE with percentiles + Weibull probability plot) and Kaplan-Meier survival (right-censoring).
 - **DOE** — create full 2^k and 2^(k-p) fractional factorial designs (generators, resolution,
   defining relation, replicates, center points, randomized run order) and **response-surface
   designs** (central composite + Box-Behnken); analyze 2-level factorials (effects, ANOVA,
@@ -48,7 +51,7 @@ that is converted to a Core `Worksheet` whenever an analysis runs.
 ```
 dotnet build StatStudio.slnx
 dotnet run  --project src/StatStudio.Wpf
-dotnet run  --project tools/StatStudio.Smoke      # 241 numeric checks vs reference values
+dotnet run  --project tools/StatStudio.Smoke      # 258 numeric checks vs reference values
 ```
 
 `StatStudio.Wpf --demo` loads a sample dataset and runs a few analyses (see `ProcessArgs` for the
@@ -65,5 +68,5 @@ Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
 
 ## Not yet included
 
-Mixture designs, factor analysis, reliability/survival, and a worksheet calculator language.
-The engine-per-analysis + dialog + Session-output design makes these additive.
+Mixture designs and a worksheet calculator language. The engine-per-analysis + dialog +
+Session-output design makes these additive.

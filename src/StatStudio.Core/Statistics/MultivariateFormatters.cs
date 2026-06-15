@@ -36,6 +36,31 @@ public static class MultivariateFormatters
                "Cluster Centroids\n" + cent;
     }
 
+    public static string FactorAnalysis(FactorAnalysisResult r)
+    {
+        int m = r.NumFactors;
+        var headers = new List<string> { "Variable" };
+        for (int j = 0; j < m; j++) headers.Add($"Factor{j + 1}");
+        headers.Add("Communality");
+        var load = new TextTable(headers.ToArray()).LeftAlign(0);
+        for (int i = 0; i < r.Variables.Count; i++)
+        {
+            var cells = new List<string> { r.Variables[i] };
+            for (int j = 0; j < m; j++) cells.Add(Fmt.N(r.Loadings[i, j], 3));
+            cells.Add(Fmt.N(r.Communalities[i], 3));
+            load.Add(cells.ToArray());
+        }
+
+        var varTab = new TextTable(new[] { "" }.Concat(Enumerable.Range(1, m).Select(j => $"Factor{j}")).ToArray()).LeftAlign(0);
+        varTab.Add(new[] { "Variance" }.Concat(r.VarianceExplained.Select(v => Fmt.N(v, 4))).ToArray());
+        varTab.Add(new[] { "% Var" }.Concat(r.Proportion.Select(v => Fmt.N(v, 4))).ToArray());
+
+        return $"Factor Analysis: {string.Join(", ", r.Variables)}\n\n" +
+               $"Principal-components extraction, {m} factor(s)" + (r.Rotated ? ", varimax rotation" : "") + "\n\n" +
+               "Loadings and Communalities\n" + load + "\n\n" +
+               "Variance Explained\n" + varTab;
+    }
+
     public static string Fisher(FisherResult r)
     {
         var t = new TextTable("", "Col 1", "Col 2").LeftAlign(0);

@@ -75,7 +75,12 @@
                 </MenuItem>
                 <MenuItem Header="_Multivariate">
                     <MenuItem Header="_Principal Components…" Click="OnPca"/>
+                    <MenuItem Header="_Factor Analysis…" Click="OnFactorAnalysis"/>
                     <MenuItem Header="Cluster _K-Means…" Click="OnKMeans"/>
+                </MenuItem>
+                <MenuItem Header="_Reliability / Survival">
+                    <MenuItem Header="_Distribution Analysis…" Click="OnDistFit"/>
+                    <MenuItem Header="_Kaplan-Meier…" Click="OnKaplanMeier"/>
                 </MenuItem>
                 <MenuItem Header="_DOE">
                     <MenuItem Header="_Create Factorial Design…" Click="OnCreateFactorial"/>

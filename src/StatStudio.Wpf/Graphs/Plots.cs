@@ -275,6 +275,47 @@ internal static class Plots
         p.Axes.Margins(bottom: 0);
     }
 
+    public static void WeibullPlot(Plot p, string name, double[] times, double beta, double eta)
+    {
+        var sorted = times.OrderBy(v => v).ToArray();
+        int n = sorted.Length;
+        var xs = new double[n];
+        var ys = new double[n];
+        for (int i = 0; i < n; i++)
+        {
+            double prob = (i + 1 - 0.3) / (n + 0.4);
+            xs[i] = Math.Log(sorted[i]);
+            ys[i] = Math.Log(-Math.Log(1 - prob));
+        }
+        var sp = p.Add.ScatterPoints(xs, ys);
+        sp.Color = Accent; sp.MarkerSize = 6;
+
+        double x0 = xs[0], x1 = xs[^1];
+        var line = p.Add.Scatter(new[] { x0, x1 }, new[] { beta * (x0 - Math.Log(eta)), beta * (x1 - Math.Log(eta)) });
+        line.Color = Color.FromHex("#F6BB42"); line.MarkerSize = 0; line.LineWidth = 2;
+
+        p.Title($"Weibull Probability Plot of {name}");
+        p.XLabel("ln(time)"); p.YLabel("ln(-ln(1 - p))");
+    }
+
+    public static void StepSurvival(Plot p, string name, double[] times, double[] survival)
+    {
+        var xs = new List<double> { 0 };
+        var ys = new List<double> { 1 };
+        double prev = 1;
+        for (int i = 0; i < times.Length; i++)
+        {
+            xs.Add(times[i]); ys.Add(prev);
+            xs.Add(times[i]); ys.Add(survival[i]);
+            prev = survival[i];
+        }
+        var line = p.Add.Scatter(xs.ToArray(), ys.ToArray());
+        line.Color = Accent; line.MarkerSize = 0; line.LineWidth = 2;
+        p.Title($"Kaplan-Meier Survival of {name}");
+        p.XLabel("Time"); p.YLabel("Survival probability");
+        p.Axes.SetLimitsY(0, 1.05);
+    }
+
     public static void Scree(Plot p, double[] eigenvalues)
     {
         var xs = Enumerable.Range(1, eigenvalues.Length).Select(i => (double)i).ToArray();

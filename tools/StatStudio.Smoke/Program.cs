@@ -15,6 +15,7 @@ internal static class Program
         TimeSeriesTests.Run();
         MultiTests.Run();
         DoeTests.Run();
+        FaRelTests.Run();
         return Check.Summary();
     }
 }
