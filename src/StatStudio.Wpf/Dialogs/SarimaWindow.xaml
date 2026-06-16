@@ -1,7 +1,7 @@
 <Window x:Class="StatStudio.Wpf.Dialogs.SarimaWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Background="#1E1E1E" Foreground="#D4D4D4"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
         Title="Seasonal ARIMA (SARIMA)" Height="Auto" Width="360" SizeToContent="Height"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="14">
@@ -9,13 +9,13 @@
             <TextBlock Text="Series:" Width="170" VerticalAlignment="Center"/>
             <ComboBox x:Name="SeriesCombo"/>
         </DockPanel>
-        <TextBlock Text="Non-seasonal (p, d, q):" Foreground="#9CDCFE" Margin="0,0,0,4"/>
+        <TextBlock Text="Non-seasonal (p, d, q):" Foreground="{DynamicResource AccentLight}" Margin="0,0,0,4"/>
         <DockPanel Margin="0,0,0,8">
             <TextBox x:Name="PBox" Text="1" Width="60" Margin="0,0,8,0"/>
             <TextBox x:Name="DBox" Text="0" Width="60" Margin="0,0,8,0"/>
             <TextBox x:Name="QBox" Text="0" Width="60"/>
         </DockPanel>
-        <TextBlock Text="Seasonal (P, D, Q):" Foreground="#9CDCFE" Margin="0,0,0,4"/>
+        <TextBlock Text="Seasonal (P, D, Q):" Foreground="{DynamicResource AccentLight}" Margin="0,0,0,4"/>
         <DockPanel Margin="0,0,0,8">
             <TextBox x:Name="SPBox" Text="0" Width="60" Margin="0,0,8,0"/>
             <TextBox x:Name="SDBox" Text="1" Width="60" Margin="0,0,8,0"/>

@@ -365,7 +365,7 @@ public partial class MainWindow : Window
     private void ShowGraph(string title, Action<ScottPlot.Plot> build)
     {
         var g = new GraphWindow(title) { Owner = this };
-        Plots.ApplyDark(g.Plot);
+        Plots.ApplyTheme(g.Plot);
         build(g.Plot);
         g.Render();
         g.Show();

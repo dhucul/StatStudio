@@ -1,7 +1,7 @@
 <Window x:Class="StatStudio.Wpf.Dialogs.RegressionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Background="#1E1E1E" Foreground="#D4D4D4"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
         Title="Multiple Regression" Height="460" Width="380"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="12">
@@ -20,9 +20,9 @@
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Response (Y):" VerticalAlignment="Center" Margin="0,0,10,10"/>
         <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ResponseCombo" Margin="0,0,0,10"/>
 
-        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Foreground="#9CDCFE" Margin="0,0,0,6"
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Foreground="{DynamicResource AccentLight}" Margin="0,0,0,6"
                    Text="Predictors (X):"/>
-        <Border Grid.Row="3" Grid.ColumnSpan="2" BorderBrush="#3C3C3C" BorderThickness="1" Margin="0,0,0,10">
+        <Border Grid.Row="3" Grid.ColumnSpan="2" BorderBrush="{DynamicResource PanelBorder}" BorderThickness="1" Margin="0,0,0,10">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl x:Name="List" Margin="4"/>
             </ScrollViewer>

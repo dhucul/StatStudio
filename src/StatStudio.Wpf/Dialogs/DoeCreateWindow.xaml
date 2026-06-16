@@ -1,11 +1,11 @@
 <Window x:Class="StatStudio.Wpf.Dialogs.DoeCreateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Background="#1E1E1E" Foreground="#D4D4D4"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
         Title="Create Factorial Design" Height="Auto" Width="340" SizeToContent="Height"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="14">
-        <TextBlock Foreground="#9CDCFE" Margin="0,0,0,10" TextWrapping="Wrap"
+        <TextBlock Foreground="{DynamicResource AccentLight}" Margin="0,0,0,10" TextWrapping="Wrap"
                    Text="Full 2^k factorial in coded units (±1). The design is written to a new worksheet."/>
         <DockPanel Margin="0,0,0,8">
             <TextBlock Text="Number of factors (k):" Width="160" VerticalAlignment="Center"/>

@@ -3,7 +3,7 @@
 ; Produces dist\StatStudioSetup.exe from the self-contained publish in dist\publish.
 
 #define MyAppName "StatStudio"
-#define MyAppVersion "2.0"
+#define MyAppVersion "2.1"
 #define MyAppPublisher "StatStudio"
 #define MyAppExeName "StatStudio.exe"
 
@@ -31,7 +31,7 @@ OutputBaseFilename=StatStudioSetup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-VersionInfoVersion=2.0.0.0
+VersionInfoVersion=2.1.0.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Setup
 

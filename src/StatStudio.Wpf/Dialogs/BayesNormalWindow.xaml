@@ -1,7 +1,7 @@
 <Window x:Class="StatStudio.Wpf.Dialogs.BayesNormalWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Background="#1E1E1E" Foreground="#D4D4D4"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
         Title="Bayesian Normal Mean" Height="Auto" Width="360" SizeToContent="Height"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="14">
