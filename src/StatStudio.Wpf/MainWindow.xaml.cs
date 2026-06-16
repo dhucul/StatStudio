@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Sheet.LoadingRow += (_, e) => e.Row.Header = (e.Row.GetIndex() + 1).ToString();
+        PopulateSampleData();
         NewWorksheet();
         Log("StatStudio — ready.");
         Log("Open a CSV (File ▸ Open Data) or type data into the worksheet, then run an analysis from the Stat or Graph menu.");
@@ -61,6 +62,10 @@ public partial class MainWindow : Window
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
                         p => Plots.CapabilityHistogram(p, "Height", cv, 150, 190, 170)); break;
+                case "--shot-sample":
+                    LoadWorksheet(CoreData.SampleData.All.First(d => d.Name.StartsWith("Flower")).Build());
+                    Log("Loaded sample dataset: Flower Measurements.");
+                    break;
                 case "--shot-dlg":
                     new Dialogs.ColumnPickerWindow("DialogProbe", "Variables (numeric):",
                         new[] { "Height", "Weight", "Group" }) { Owner = this }.Show();
@@ -243,6 +248,22 @@ public partial class MainWindow : Window
     }
 
     // ---- worksheet plumbing -----------------------------------------------
+
+    private void PopulateSampleData()
+    {
+        foreach (var ds in CoreData.SampleData.All)
+        {
+            var item = new MenuItem { Header = ds.Name, ToolTip = ds.Description };
+            var build = ds.Build;
+            var name = ds.Name;
+            item.Click += (_, _) =>
+            {
+                try { LoadWorksheet(build()); Log($"Loaded sample dataset: {name}."); }
+                catch (Exception ex) { ShowError("Sample data", ex); }
+            };
+            SampleDataMenu.Items.Add(item);
+        }
+    }
 
     private void NewWorksheet()
     {

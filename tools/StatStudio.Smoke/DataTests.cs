@@ -78,6 +78,19 @@ internal static class DataTests
         Check.Close(Calculator.Evaluate("2 * -3", cw2)[0], -6, "unary minus after operator");
         Check.Close(Calculator.Evaluate("2^3^2", cw2)[0], 512, "power is right-associative");
 
+        Check.Section("Sample datasets build");
+        foreach (var ds in SampleData.All)
+        {
+            var dsw = ds.Build();
+            Check.True(dsw.ColumnCount > 0 && dsw.RowCount > 0, $"{ds.Name} non-empty ({dsw.ColumnCount}x{dsw.RowCount})");
+        }
+        var conc = SampleData.All.First(d => d.Name.StartsWith("Concrete")).Build();
+        double rowSum = conc.Find("Cement")![0]!.Length > 0
+            ? double.Parse(conc.Find("Cement")![0]!, System.Globalization.CultureInfo.InvariantCulture)
+            + double.Parse(conc.Find("Water")![0]!, System.Globalization.CultureInfo.InvariantCulture)
+            + double.Parse(conc.Find("Aggregate")![0]!, System.Globalization.CultureInfo.InvariantCulture) : 0;
+        Check.Close(rowSum, 1.0, "concrete mixture row sums to 1", 1e-3);
+
         Check.Section("Project (.ssproj) round-trip");
         var proj = Path.Combine(Path.GetTempPath(), "statstudio_smoke.ssproj");
         ProjectStore.Save(xw, proj);

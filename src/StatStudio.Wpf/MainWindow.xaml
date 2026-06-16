@@ -9,6 +9,7 @@
             <MenuItem Header="_File">
                 <MenuItem Header="_New Worksheet" Click="OnNewWorksheet"/>
                 <MenuItem Header="_Open Data (CSV / Excel)…" Click="OnOpenCsv"/>
+                <MenuItem Header="Sample _Data" x:Name="SampleDataMenu"/>
                 <MenuItem Header="_Save Worksheet As…" Click="OnSaveCsv"/>
                 <Separator/>
                 <MenuItem Header="Open _Project (.ssproj)…" Click="OnOpenProject"/>

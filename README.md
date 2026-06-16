@@ -7,7 +7,8 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
 ## Features
 
 - **Worksheet** — editable column grid (C1, C2, …); import/export **CSV/TSV** and **Excel (.xlsx)**;
-  native **`.ssproj`** project files; missing values as `*`.
+  native **`.ssproj`** project files; missing values as `*`. **File ▸ Sample Data** loads
+  ten built-in example datasets tuned to the various analyses.
 - **Basic Statistics** — descriptive statistics (Minitab quartile method), 1-sample / 2-sample
   (pooled & Welch) / paired *t*, 1- & 2-proportion, chi-square goodness-of-fit and association,
   Pearson/Spearman correlation, Anderson-Darling normality, F-test for two variances, Fisher's exact.
