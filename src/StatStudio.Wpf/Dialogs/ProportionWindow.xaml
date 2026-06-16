@@ -1,7 +1,7 @@
 <Window x:Class="StatStudio.Wpf.Dialogs.ProportionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Background="#1E1E1E" Foreground="#D4D4D4"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
         Title="Proportion Test" Height="330" Width="360"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="14">
@@ -22,7 +22,7 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.ColumnSpan="4" x:Name="Prompt" Foreground="#9CDCFE"
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="4" x:Name="Prompt" Foreground="{DynamicResource AccentLight}"
                    Margin="0,0,0,10" Text="Enter summarized counts."/>
 
         <TextBlock Grid.Row="1" Grid.Column="0" Text="Sample 1  Events:" VerticalAlignment="Center" Margin="0,0,8,8"/>

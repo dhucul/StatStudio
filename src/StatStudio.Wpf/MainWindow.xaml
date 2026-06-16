@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="StatStudio" Height="780" Width="1200"
         WindowStartupLocation="CenterScreen"
-        Background="#1E1E1E" Foreground="#D4D4D4">
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}">
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
@@ -135,9 +135,9 @@
         </Menu>
 
         <StatusBar DockPanel.Dock="Bottom">
-            <StatusBarItem><TextBlock x:Name="StatusText" Text="Ready"/></StatusBarItem>
+            <StatusBarItem><TextBlock x:Name="StatusText" Text="Ready" Foreground="White"/></StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="DimsText" Text=""/>
+                <TextBlock x:Name="DimsText" Text="" Foreground="White"/>
             </StatusBarItem>
         </StatusBar>
 
@@ -149,15 +149,15 @@
             </Grid.ColumnDefinitions>
 
             <!-- Navigator -->
-            <DockPanel Grid.Column="0" Background="#252526">
+            <DockPanel Grid.Column="0" Background="{DynamicResource Panel}">
                 <TextBlock DockPanel.Dock="Top" Text="Navigator" Margin="8,6"
-                           Foreground="#9CDCFE" FontWeight="SemiBold"/>
-                <ListBox x:Name="NavList" BorderThickness="0" Background="#252526"
+                           Foreground="{DynamicResource AccentLight}" FontWeight="SemiBold"/>
+                <ListBox x:Name="NavList" BorderThickness="0" Background="{DynamicResource Panel}"
                          MouseDoubleClick="OnNavDoubleClick"/>
             </DockPanel>
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
-                          Background="#3C3C3C"/>
+                          Background="{DynamicResource PanelBorder}"/>
 
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
@@ -169,20 +169,20 @@
                 <!-- Session output -->
                 <DockPanel Grid.Row="0">
                     <TextBlock DockPanel.Dock="Top" Text="Session" Margin="8,6"
-                               Foreground="#9CDCFE" FontWeight="SemiBold"/>
+                               Foreground="{DynamicResource AccentLight}" FontWeight="SemiBold"/>
                     <TextBox x:Name="Session" IsReadOnly="True" BorderThickness="0"
-                             Background="#1E1E1E" FontFamily="Consolas" FontSize="13"
+                             Background="{DynamicResource Surface}" FontFamily="Consolas" FontSize="13"
                              TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"/>
                 </DockPanel>
 
                 <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch"
-                              Background="#3C3C3C"/>
+                              Background="{DynamicResource PanelBorder}"/>
 
                 <!-- Worksheet -->
                 <DockPanel Grid.Row="2">
                     <TextBlock x:Name="WorksheetHeader" DockPanel.Dock="Top" Text="Worksheet"
-                               Margin="8,6" Foreground="#9CDCFE" FontWeight="SemiBold"/>
+                               Margin="8,6" Foreground="{DynamicResource AccentLight}" FontWeight="SemiBold"/>
                     <DataGrid x:Name="Sheet" AutoGenerateColumns="True" CanUserAddRows="True"
                               CanUserDeleteRows="True" HeadersVisibility="All"
                               SelectionUnit="CellOrRowHeader" BorderThickness="0"

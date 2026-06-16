@@ -7,26 +7,26 @@ namespace StatStudio.Wpf.Graphs;
 /// <summary>Builds the Phase-1 statistical graphs into a ScottPlot <see cref="Plot"/>.</summary>
 internal static class Plots
 {
-    private static readonly Color Bg = Color.FromHex("#1E1E1E");
-    private static readonly Color Fg = Color.FromHex("#D4D4D4");
-    private static readonly Color GridLine = Color.FromHex("#333333");
-    private static readonly Color Accent = Color.FromHex("#4FC1E9");
+    private static readonly Color Bg = Color.FromHex("#FFFFFF");
+    private static readonly Color Fg = Color.FromHex("#1F1F1F");
+    private static readonly Color GridLine = Color.FromHex("#E2E2E2");
+    private static readonly Color Accent = Color.FromHex("#0A66C2");
 
     private static readonly Color[] Palette =
     {
-        Color.FromHex("#4FC1E9"), Color.FromHex("#F6BB42"), Color.FromHex("#A0D468"),
-        Color.FromHex("#ED5565"), Color.FromHex("#AC92EC"), Color.FromHex("#48CFAD"),
+        Color.FromHex("#2E9BD6"), Color.FromHex("#E0900F"), Color.FromHex("#5BA832"),
+        Color.FromHex("#D64550"), Color.FromHex("#8A63D2"), Color.FromHex("#1FA88C"),
     };
 
-    public static void ApplyDark(Plot p)
+    public static void ApplyTheme(Plot p)
     {
         p.FigureBackground.Color = Bg;
         p.DataBackground.Color = Bg;
         p.Axes.Color(Fg);
         p.Grid.MajorLineColor = GridLine;
-        p.Legend.BackgroundColor = Color.FromHex("#252526");
+        p.Legend.BackgroundColor = Color.FromHex("#FFFFFF");
         p.Legend.FontColor = Fg;
-        p.Legend.OutlineColor = GridLine;
+        p.Legend.OutlineColor = Color.FromHex("#C8C8C8");
     }
 
     public static void Histogram(Plot p, string name, double[] values)
@@ -131,7 +131,7 @@ internal static class Plots
 
         double x0 = xs.Min(), x1 = xs.Max();
         var line = p.Add.Scatter(new[] { x0, x1 }, new[] { intercept + slope * x0, intercept + slope * x1 });
-        line.Color = Color.FromHex("#F6BB42");
+        line.Color = Color.FromHex("#E0900F");
         line.MarkerSize = 0;
         line.LineWidth = 2;
 
@@ -167,13 +167,13 @@ internal static class Plots
 
         // Center line and control limits (per-point limits draw as stepped scatter).
         var cl = p.Add.HorizontalLine(chart.Center);
-        cl.Color = Color.FromHex("#2ECC71");
+        cl.Color = Color.FromHex("#1E9E4A");
         cl.LineWidth = 1.5f;
 
         var ucl = p.Add.Scatter(xs, chart.Ucl);
-        ucl.Color = Color.FromHex("#ED5565"); ucl.MarkerSize = 0; ucl.LineWidth = 1.5f; ucl.LinePattern = LinePattern.Dashed;
+        ucl.Color = Color.FromHex("#D64550"); ucl.MarkerSize = 0; ucl.LineWidth = 1.5f; ucl.LinePattern = LinePattern.Dashed;
         var lcl = p.Add.Scatter(xs, chart.Lcl);
-        lcl.Color = Color.FromHex("#ED5565"); lcl.MarkerSize = 0; lcl.LineWidth = 1.5f; lcl.LinePattern = LinePattern.Dashed;
+        lcl.Color = Color.FromHex("#D64550"); lcl.MarkerSize = 0; lcl.LineWidth = 1.5f; lcl.LinePattern = LinePattern.Dashed;
 
         // Highlight out-of-control points in red.
         var oocX = new List<double>();
@@ -183,7 +183,7 @@ internal static class Plots
         if (oocX.Count > 0)
         {
             var bad = p.Add.ScatterPoints(oocX.ToArray(), oocY.ToArray());
-            bad.Color = Color.FromHex("#ED5565");
+            bad.Color = Color.FromHex("#D64550");
             bad.MarkerSize = 10;
         }
 
@@ -204,13 +204,13 @@ internal static class Plots
         if (fx.Count > 0)
         {
             var fit = p.Add.Scatter(fx.ToArray(), fy.ToArray());
-            fit.Color = Color.FromHex("#F6BB42"); fit.MarkerSize = 0; fit.LineWidth = 2; fit.LegendText = "Fitted";
+            fit.Color = Color.FromHex("#E0900F"); fit.MarkerSize = 0; fit.LineWidth = 2; fit.LegendText = "Fitted";
         }
         if (forecasts.Length > 0)
         {
             var fxs = Enumerable.Range(n + 1, forecasts.Length).Select(i => (double)i).ToArray();
             var fcl = p.Add.Scatter(fxs, forecasts);
-            fcl.Color = Color.FromHex("#A0D468"); fcl.MarkerSize = 5; fcl.LineWidth = 2;
+            fcl.Color = Color.FromHex("#5BA832"); fcl.MarkerSize = 5; fcl.LineWidth = 2;
             fcl.LinePattern = LinePattern.Dashed; fcl.LegendText = "Forecast";
         }
         p.ShowLegend();
@@ -229,11 +229,11 @@ internal static class Plots
         {
             var fxs = Enumerable.Range(n + 1, forecasts.Length).Select(i => (double)i).ToArray();
             var band = p.Add.Scatter(fxs, upper);
-            band.Color = Color.FromHex("#ED5565"); band.MarkerSize = 0; band.LineWidth = 1; band.LinePattern = LinePattern.Dotted; band.LegendText = "95% CI";
+            band.Color = Color.FromHex("#D64550"); band.MarkerSize = 0; band.LineWidth = 1; band.LinePattern = LinePattern.Dotted; band.LegendText = "95% CI";
             var bandLo = p.Add.Scatter(fxs, lower);
-            bandLo.Color = Color.FromHex("#ED5565"); bandLo.MarkerSize = 0; bandLo.LineWidth = 1; bandLo.LinePattern = LinePattern.Dotted;
+            bandLo.Color = Color.FromHex("#D64550"); bandLo.MarkerSize = 0; bandLo.LineWidth = 1; bandLo.LinePattern = LinePattern.Dotted;
             var fc = p.Add.Scatter(fxs, forecasts);
-            fc.Color = Color.FromHex("#A0D468"); fc.MarkerSize = 5; fc.LineWidth = 2; fc.LinePattern = LinePattern.Dashed; fc.LegendText = "Forecast";
+            fc.Color = Color.FromHex("#5BA832"); fc.MarkerSize = 5; fc.LineWidth = 2; fc.LinePattern = LinePattern.Dashed; fc.LegendText = "Forecast";
         }
         p.ShowLegend();
         p.Title($"ARIMA Forecast of {name}");
@@ -251,7 +251,7 @@ internal static class Plots
         foreach (var b in new[] { bound, -bound })
         {
             var ln = p.Add.HorizontalLine(b);
-            ln.Color = Color.FromHex("#ED5565"); ln.LineWidth = 1; ln.LinePattern = LinePattern.Dashed;
+            ln.Color = Color.FromHex("#D64550"); ln.LineWidth = 1; ln.LinePattern = LinePattern.Dashed;
         }
         var zero = p.Add.HorizontalLine(0); zero.Color = Fg; zero.LineWidth = 1;
         p.Title(title); p.XLabel("Lag"); p.YLabel(yLabel);
@@ -292,7 +292,7 @@ internal static class Plots
 
         double x0 = xs[0], x1 = xs[^1];
         var line = p.Add.Scatter(new[] { x0, x1 }, new[] { beta * (x0 - Math.Log(eta)), beta * (x1 - Math.Log(eta)) });
-        line.Color = Color.FromHex("#F6BB42"); line.MarkerSize = 0; line.LineWidth = 2;
+        line.Color = Color.FromHex("#E0900F"); line.MarkerSize = 0; line.LineWidth = 2;
 
         p.Title($"Weibull Probability Plot of {name}");
         p.XLabel("ln(time)"); p.YLabel("ln(-ln(1 - p))");
@@ -322,7 +322,7 @@ internal static class Plots
         var line = p.Add.Scatter(xs, eigenvalues);
         line.Color = Accent; line.MarkerSize = 7; line.LineWidth = 2;
         var one = p.Add.HorizontalLine(1.0);
-        one.Color = Color.FromHex("#ED5565"); one.LineWidth = 1; one.LinePattern = LinePattern.Dashed;
+        one.Color = Color.FromHex("#D64550"); one.LineWidth = 1; one.LinePattern = LinePattern.Dashed;
         p.Title("Scree Plot");
         p.XLabel("Component number"); p.YLabel("Eigenvalue");
     }
@@ -353,9 +353,9 @@ internal static class Plots
             ln.Color = Color.FromHex(hex);
             ln.LineWidth = 2;
         }
-        Spec(lsl, "#ED5565");
-        Spec(usl, "#ED5565");
-        Spec(target, "#2ECC71");
+        Spec(lsl, "#D64550");
+        Spec(usl, "#D64550");
+        Spec(target, "#1E9E4A");
     }
 
     public static void ProbabilityPlot(Plot p, string name, double[] values)
@@ -372,7 +372,7 @@ internal static class Plots
         {
             double x0 = sorted[0], x1 = sorted[^1];
             var fit = p.Add.Scatter(new[] { x0, x1 }, new[] { (x0 - mean) / sd, (x1 - mean) / sd });
-            fit.Color = Color.FromHex("#F6BB42");
+            fit.Color = Color.FromHex("#E0900F");
             fit.MarkerSize = 0;
             fit.LineWidth = 2;
         }
