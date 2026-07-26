@@ -12,6 +12,7 @@ namespace StatStudio.Wpf;
 public partial class MainWindow : Window
 {
     private DataTable _table = null!;
+    private bool _dirty;
 
     public MainWindow()
     {
@@ -24,6 +25,7 @@ public partial class MainWindow : Window
         Log("");
         // Run startup args after the window is shown (owned graph windows require a shown owner).
         Loaded += (_, _) => ProcessArgs(Environment.GetCommandLineArgs());
+        Closing += OnClosing;
     }
 
     // ---- startup args / demo (used for screenshots and quick checks) --------
@@ -258,6 +260,7 @@ public partial class MainWindow : Window
             var name = ds.Name;
             item.Click += (_, _) =>
             {
+                if (!ConfirmDiscardChanges()) return;
                 try { LoadWorksheet(build()); Log($"Loaded sample dataset: {name}."); }
                 catch (Exception ex) { ShowError("Sample data", ex); }
             };
@@ -267,21 +270,69 @@ public partial class MainWindow : Window
 
     private void NewWorksheet()
     {
-        _table = WorksheetGrid.NewEmpty();
+        SetTable(WorksheetGrid.NewEmpty(), markDirty: false);
+    }
+
+    private void LoadWorksheet(CoreData.Worksheet ws, bool markDirty = false)
+    {
+        var table = WorksheetGrid.ToDataTable(ws);
+        for (int i = 0; i < 5; i++) table.Rows.Add(table.NewRow()); // room to type
+        SetTable(table, markDirty);
+    }
+
+    private void SetTable(DataTable table, bool markDirty)
+    {
+        if (_table is not null)
+        {
+            _table.ColumnChanged -= OnTableChanged;
+            _table.RowChanged -= OnTableRowChanged;
+            _table.RowDeleted -= OnTableRowChanged;
+        }
+
+        _table = table;
+        _table.ColumnChanged += OnTableChanged;
+        _table.RowChanged += OnTableRowChanged;
+        _table.RowDeleted += OnTableRowChanged;
         Sheet.ItemsSource = _table.DefaultView;
-        WorksheetHeader.Text = $"Worksheet: {_table.TableName}";
+        _dirty = markDirty;
+        UpdateWorksheetHeader();
         RefreshNavigator();
         UpdateDims();
     }
 
-    private void LoadWorksheet(CoreData.Worksheet ws)
+    private void OnTableChanged(object? sender, DataColumnChangeEventArgs e) => MarkDirty();
+    private void OnTableRowChanged(object? sender, DataRowChangeEventArgs e) => MarkDirty();
+
+    private void MarkDirty()
     {
-        _table = WorksheetGrid.ToDataTable(ws);
-        for (int i = 0; i < 5; i++) _table.Rows.Add(_table.NewRow()); // room to type
-        Sheet.ItemsSource = _table.DefaultView;
-        WorksheetHeader.Text = $"Worksheet: {ws.Name}";
-        RefreshNavigator();
-        UpdateDims();
+        if (_dirty) return;
+        _dirty = true;
+        UpdateWorksheetHeader();
+    }
+
+    private void MarkClean()
+    {
+        _dirty = false;
+        UpdateWorksheetHeader();
+    }
+
+    private void UpdateWorksheetHeader() =>
+        WorksheetHeader.Text = $"Worksheet: {_table.TableName}{(_dirty ? " *" : "")}";
+
+    private bool ConfirmDiscardChanges()
+    {
+        Sheet.CommitEdit(DataGridEditingUnit.Row, true);
+        if (!_dirty) return true;
+        return MessageBox.Show(
+            "The current worksheet has unsaved changes. Discard them?",
+            "Unsaved changes",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
+    private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (!ConfirmDiscardChanges()) e.Cancel = true;
     }
 
     /// <summary>Current grid contents as a Core worksheet (commits any in-progress edit first).</summary>
@@ -373,7 +424,10 @@ public partial class MainWindow : Window
 
     // ---- File menu ---------------------------------------------------------
 
-    private void OnNewWorksheet(object sender, RoutedEventArgs e) => NewWorksheet();
+    private void OnNewWorksheet(object sender, RoutedEventArgs e)
+    {
+        if (ConfirmDiscardChanges()) NewWorksheet();
+    }
 
     private void OnOpenCsv(object sender, RoutedEventArgs e)
     {
@@ -388,6 +442,7 @@ public partial class MainWindow : Window
             var ws = dlg.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
                 ? CoreData.WorksheetIo.ReadXlsx(dlg.FileName)
                 : CoreData.WorksheetIo.ReadCsv(dlg.FileName);
+            if (!ConfirmDiscardChanges()) return;
             LoadWorksheet(ws);
             Log($"Opened '{System.IO.Path.GetFileName(dlg.FileName)}' — {ws.ColumnCount} columns, {ws.RowCount} rows.");
         }
@@ -409,7 +464,9 @@ public partial class MainWindow : Window
             if (dlg.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
                 CoreData.WorksheetIo.WriteXlsx(ws, dlg.FileName);
             else
-                CoreData.WorksheetIo.WriteCsv(ws, dlg.FileName);
+                CoreData.WorksheetIo.WriteCsv(ws, dlg.FileName,
+                    dlg.FileName.EndsWith(".tsv", StringComparison.OrdinalIgnoreCase) ? '\t' : ',');
+            MarkClean();
             Log($"Saved worksheet to '{System.IO.Path.GetFileName(dlg.FileName)}'.");
         }
         catch (Exception ex) { ShowError("Save failed", ex); }
@@ -425,7 +482,9 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() != true) return;
         try
         {
-            LoadWorksheet(CoreData.ProjectStore.Load(dlg.FileName));
+            var ws = CoreData.ProjectStore.Load(dlg.FileName);
+            if (!ConfirmDiscardChanges()) return;
+            LoadWorksheet(ws);
             Log($"Opened project '{System.IO.Path.GetFileName(dlg.FileName)}'.");
         }
         catch (Exception ex) { ShowError("Open project failed", ex); }
@@ -443,6 +502,7 @@ public partial class MainWindow : Window
         try
         {
             CoreData.ProjectStore.Save(CurrentWorksheet(), dlg.FileName);
+            MarkClean();
             Log($"Saved project to '{System.IO.Path.GetFileName(dlg.FileName)}'.");
         }
         catch (Exception ex) { ShowError("Save project failed", ex); }
@@ -535,9 +595,13 @@ public partial class MainWindow : Window
         {
             var obs = ws.Find(n)!.NumericValues();
             if (obs.Length < 2) { Log($"{n}: need at least 2 categories."); continue; }
-            var r = HypothesisTests.ChiSquareGof(obs);
-            var cats = Enumerable.Range(1, obs.Length).Select(i => i.ToString()).ToList();
-            OutputRaw($"Goodness-of-Fit for {n}\n" + HypothesisFormatters.ChiSquareGof(r, cats));
+            try
+            {
+                var r = HypothesisTests.ChiSquareGof(obs);
+                var cats = Enumerable.Range(1, obs.Length).Select(i => i.ToString()).ToList();
+                OutputRaw($"Goodness-of-Fit for {n}\n" + HypothesisFormatters.ChiSquareGof(r, cats));
+            }
+            catch (Exception ex) { Log($"{n}: {ex.Message}"); }
         }
     }
 
@@ -549,16 +613,21 @@ public partial class MainWindow : Window
             "Columns forming the table (each column = a table column):", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
 
-        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!.NumericValues()).ToList();
-        int rows = cols.Min(c => c.Length);
+        var selected = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var completeRows = Columns.Rows(selected);
+        int rows = completeRows.Count;
         if (rows < 2) { Log("Need at least 2 rows of counts."); return; }
-        var table = new double[rows, cols.Count];
+        var table = new double[rows, selected.Count];
         for (int i = 0; i < rows; i++)
-            for (int j = 0; j < cols.Count; j++) table[i, j] = cols[j][i];
+            for (int j = 0; j < selected.Count; j++) table[i, j] = completeRows[i][j];
 
-        var r = HypothesisTests.ChiSquareAssociation(table);
-        var rowLabels = Enumerable.Range(1, rows).Select(i => $"R{i}").ToList();
-        OutputRaw(HypothesisFormatters.Contingency(r, rowLabels, dlg.SelectedColumns));
+        try
+        {
+            var r = HypothesisTests.ChiSquareAssociation(table);
+            var rowLabels = Enumerable.Range(1, rows).Select(i => $"R{i}").ToList();
+            OutputRaw(HypothesisFormatters.Contingency(r, rowLabels, dlg.SelectedColumns));
+        }
+        catch (Exception ex) { Log($"Chi-square association: {ex.Message}"); }
     }
 
     private void OnOneWayAnova(object sender, RoutedEventArgs e)
@@ -792,7 +861,7 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() != true) return;
         var t = ws.Find(dlg.TimesColumn)!.NumericValues();
         if (t.Length < 3) { Log("Need at least 3 observations."); return; }
-        if (dlg.Distribution != "Normal" && t.Any(v => v <= 0))
+        if (t.Any(v => v <= 0))
         { Log($"{dlg.Distribution} requires all times > 0."); return; }
         try
         {
@@ -832,14 +901,24 @@ public partial class MainWindow : Window
         {
             var (tv, cv) = Columns.Pairwise(ws.Find(dlg.TimesColumn)!, ws.Find(dlg.CensorColumn)!);
             times = tv;
+            if (cv.Any(v => v != 0 && v != 1))
+            {
+                Log("Censoring indicators must be exactly 0 (event) or 1 (censored).");
+                return;
+            }
             censored = cv.Select(v => v == 1).ToArray();
         }
         if (times.Length < 2) { Log("Need at least 2 observations."); return; }
-        var km = Reliability.KaplanMeier(times, censored);
-        OutputRaw(ReliabilityFormatters.KaplanMeier(km, dlg.TimesColumn));
-        ShowGraph($"Kaplan-Meier Survival of {dlg.TimesColumn}",
-            p => Plots.StepSurvival(p, dlg.TimesColumn, km.Rows.Select(r => r.Time).ToArray(),
-                km.Rows.Select(r => r.Survival).ToArray()));
+        if (times.Any(t => t < 0)) { Log("Survival times must be nonnegative."); return; }
+        try
+        {
+            var km = Reliability.KaplanMeier(times, censored);
+            OutputRaw(ReliabilityFormatters.KaplanMeier(km, dlg.TimesColumn));
+            ShowGraph($"Kaplan-Meier Survival of {dlg.TimesColumn}",
+                p => Plots.StepSurvival(p, dlg.TimesColumn, km.Rows.Select(r => r.Time).ToArray(),
+                    km.Rows.Select(r => r.Survival).ToArray()));
+        }
+        catch (Exception ex) { Log($"Kaplan-Meier: {ex.Message}"); }
     }
 
     private void OnPowerSampleSize(object sender, RoutedEventArgs e)
@@ -885,6 +964,7 @@ public partial class MainWindow : Window
     {
         var dlg = new DoeCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        if (!ConfirmDiscardChanges()) return;
         var design = DoeDesign.FullFactorial(dlg.Factors, dlg.Replicates, dlg.CenterPoints, dlg.Randomize);
         var inv = System.Globalization.CultureInfo.InvariantCulture;
 
@@ -900,7 +980,7 @@ public partial class MainWindow : Window
             cp.Add(run.CenterPt.ToString());
             for (int j = 0; j < fcols.Count; j++) fcols[j].Add(run.Factors[j].ToString(inv));
         }
-        LoadWorksheet(ws);
+        LoadWorksheet(ws, markDirty: true);
         Log(DoeFormatters.Design(design));
     }
 
@@ -908,6 +988,7 @@ public partial class MainWindow : Window
     {
         var dlg = new FractionalCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        if (!ConfirmDiscardChanges()) return;
         var design = DoeDesign.FractionalFactorial(dlg.Factors, dlg.Runs, dlg.Randomize);
         var inv = System.Globalization.CultureInfo.InvariantCulture;
 
@@ -921,7 +1002,7 @@ public partial class MainWindow : Window
             ro.Add(run.RunOrder.ToString());
             for (int j = 0; j < fcols.Count; j++) fcols[j].Add(run.Factors[j].ToString(inv));
         }
-        LoadWorksheet(ws);
+        LoadWorksheet(ws, markDirty: true);
         Log(DoeFormatters.Fractional(design));
     }
 
@@ -937,7 +1018,7 @@ public partial class MainWindow : Window
             var col = ws.Find(dlg.TargetColumn) ?? ws.AddColumn(dlg.TargetColumn);
             col.Clear();
             foreach (var v in result) col.Add(double.IsNaN(v) ? null : v.ToString("0.##########", inv));
-            LoadWorksheet(ws);
+            LoadWorksheet(ws, markDirty: true);
             Log($"Calculated '{dlg.TargetColumn}' = {dlg.Expression}  ({result.Length} rows).");
         }
         catch (Exception ex) { ShowError("Calculator", ex); }
@@ -947,6 +1028,7 @@ public partial class MainWindow : Window
     {
         var dlg = new MixtureCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        if (!ConfirmDiscardChanges()) return;
         var design = dlg.IsLattice
             ? MixtureDesign.SimplexLattice(dlg.Components, dlg.Degree, dlg.Randomize)
             : MixtureDesign.SimplexCentroid(dlg.Components, dlg.Randomize);
@@ -964,7 +1046,7 @@ public partial class MainWindow : Window
             pt.Add(run.PointType);
             for (int j = 0; j < ccols.Count; j++) ccols[j].Add(run.Components[j].ToString("0.#####", inv));
         }
-        LoadWorksheet(ws);
+        LoadWorksheet(ws, markDirty: true);
         Log(DoeFormatters.Mixture(design));
     }
 
@@ -988,6 +1070,7 @@ public partial class MainWindow : Window
     {
         var dlg = new RsmCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        if (!ConfirmDiscardChanges()) return;
         var design = dlg.IsBoxBehnken
             ? ResponseSurface.BoxBehnken(dlg.Factors, dlg.CenterPoints, dlg.Randomize)
             : ResponseSurface.CentralComposite(dlg.Factors, dlg.CenterPoints, dlg.FaceCentered, dlg.Randomize);
@@ -1005,7 +1088,7 @@ public partial class MainWindow : Window
             pt.Add(run.PointType);
             for (int j = 0; j < fcols.Count; j++) fcols[j].Add(run.Factors[j].ToString("0.#####", inv));
         }
-        LoadWorksheet(ws);
+        LoadWorksheet(ws, markDirty: true);
         Log(DoeFormatters.Rsm(design));
     }
 
@@ -1086,7 +1169,8 @@ public partial class MainWindow : Window
     {
         var v = OpenSeries("Trend Analysis", TsFields.TrendType | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
-        if (v.Length < 3) { Log("Need at least 3 points."); return; }
+        int minimum = dlg.Quadratic ? 4 : 3;
+        if (v.Length < minimum) { Log($"Need at least {minimum} points."); return; }
         var r = dlg.Quadratic ? TimeSeries.QuadraticTrend(v, dlg.Forecasts) : TimeSeries.LinearTrend(v, dlg.Forecasts);
         OutputRaw(TimeSeriesFormatters.Trend(r, name, v.Length));
         ShowGraph($"Trend Analysis of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
@@ -1096,7 +1180,7 @@ public partial class MainWindow : Window
     {
         var v = OpenSeries("Moving Average", TsFields.Length | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
-        if (v.Length <= dlg.Length) { Log("Series shorter than the MA length."); return; }
+        if (v.Length < dlg.Length) { Log("Series shorter than the MA length."); return; }
         var r = TimeSeries.MovingAverage(v, dlg.Length, dlg.Forecasts);
         OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
         ShowGraph($"Moving Average of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
@@ -1147,40 +1231,51 @@ public partial class MainWindow : Window
         ShowGraph($"Decomposition of {name} (trend)", p => Plots.TimeSeriesFit(p, name, v, r.Trend, Array.Empty<double>()));
     }
 
-    private void OnArima(object sender, RoutedEventArgs e)
+    private async void OnArima(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ArimaWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
+        ArimaResult? r = null;
+        IsEnabled = false;
+        StatusText.Text = $"Fitting ARIMA model for {dlg.SeriesColumn}â€¦";
         try
         {
-            var r = Arima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.Forecasts, dlg.IncludeConstant);
-            OutputRaw(TimeSeriesFormatters.Arima(r, dlg.SeriesColumn));
-            if (r.Forecasts.Length > 0)
-                ShowGraph($"ARIMA Forecast of {dlg.SeriesColumn}",
-                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
+            r = await Task.Run(() => Arima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.Forecasts, dlg.IncludeConstant));
         }
         catch (Exception ex) { Log($"ARIMA: {ex.Message}"); }
+        finally { IsEnabled = true; }
+        if (r is null) return;
+        OutputRaw(TimeSeriesFormatters.Arima(r, dlg.SeriesColumn));
+        if (r.Forecasts.Length > 0)
+            ShowGraph($"ARIMA Forecast of {dlg.SeriesColumn}",
+                p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
     }
 
-    private void OnSarima(object sender, RoutedEventArgs e)
+    private async void OnSarima(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new SarimaWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
+        SarimaResult? r = null;
+        IsEnabled = false;
+        StatusText.Text = $"Fitting SARIMA model for {dlg.SeriesColumn}â€¦";
         try
         {
-            var r = Sarima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.SP, dlg.SD, dlg.SQ, dlg.Season, dlg.Forecasts, dlg.IncludeConstant);
-            OutputRaw(TimeSeriesFormatters.Sarima(r, dlg.SeriesColumn));
-            if (r.Forecasts.Length > 0)
-                ShowGraph($"SARIMA Forecast of {dlg.SeriesColumn}",
-                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
+            r = await Task.Run(() => Sarima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.SP, dlg.SD, dlg.SQ,
+                dlg.Season, dlg.Forecasts, dlg.IncludeConstant));
         }
         catch (Exception ex) { Log($"SARIMA: {ex.Message}"); }
+        finally { IsEnabled = true; }
+        if (r is null) return;
+        OutputRaw(TimeSeriesFormatters.Sarima(r, dlg.SeriesColumn));
+        if (r.Forecasts.Length > 0)
+            ShowGraph($"SARIMA Forecast of {dlg.SeriesColumn}",
+                p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
     }
 
     private void OnAcf(object sender, RoutedEventArgs e) => RunAcf(false);
@@ -1373,8 +1468,21 @@ public partial class MainWindow : Window
         ShowGraph(mr.Title, p => Plots.ControlChart(p, mr));
     }
 
-    private int[] IntColumn(CoreData.Worksheet ws, string name) =>
-        ws.Find(name)!.NumericValues().Select(v => (int)Math.Round(v)).ToArray();
+    private static bool TryCounts(double[] values, bool positive, out int[] counts, out string error)
+    {
+        counts = Array.Empty<int>();
+        error = "";
+        if (values.Any(v => !double.IsFinite(v) || v != Math.Truncate(v) ||
+                            v < (positive ? 1 : 0) || v > int.MaxValue))
+        {
+            error = positive
+                ? "Sample sizes must be positive whole numbers."
+                : "Counts must be nonnegative whole numbers.";
+            return false;
+        }
+        counts = values.Select(v => (int)v).ToArray();
+        return true;
+    }
 
     private void OnPChart(object sender, RoutedEventArgs e) => AttributeChart("P");
     private void OnUChart(object sender, RoutedEventArgs e) => AttributeChart("U");
@@ -1385,15 +1493,20 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new AttributeChartWindow(numeric, $"{kind} Chart", needSizesColumn: true, needConstantSize: false) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var counts = IntColumn(ws, dlg.CountsColumn);
-        var sizes = IntColumn(ws, dlg.SizesColumn);
-        int m = Math.Min(counts.Length, sizes.Length);
-        if (m < 2) { Log("Need at least 2 rows."); return; }
-        var chart = kind == "P"
-            ? ControlCharts.PChart(counts.Take(m).ToArray(), sizes.Take(m).ToArray())
-            : ControlCharts.UChart(counts.Take(m).ToArray(), sizes.Take(m).ToArray());
-        OutputRaw(SpcFormatter.Chart(chart));
-        ShowGraph(chart.Title, p => Plots.ControlChart(p, chart));
+        var (countValues, sizeValues) = Columns.Pairwise(ws.Find(dlg.CountsColumn)!, ws.Find(dlg.SizesColumn)!);
+        if (countValues.Length < 2) { Log("Need at least 2 complete rows."); return; }
+        if (!TryCounts(countValues, positive: false, out var counts, out var error) ||
+            !TryCounts(sizeValues, positive: true, out var sizes, out error))
+        { Log(error); return; }
+        try
+        {
+            var chart = kind == "P"
+                ? ControlCharts.PChart(counts, sizes)
+                : ControlCharts.UChart(counts, sizes);
+            OutputRaw(SpcFormatter.Chart(chart));
+            ShowGraph(chart.Title, p => Plots.ControlChart(p, chart));
+        }
+        catch (Exception ex) { Log($"{kind} chart: {ex.Message}"); }
     }
 
     private void OnNpChart(object sender, RoutedEventArgs e)
@@ -1402,11 +1515,16 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new AttributeChartWindow(numeric, "NP Chart", needSizesColumn: false, needConstantSize: true) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var counts = IntColumn(ws, dlg.CountsColumn);
+        if (!TryCounts(ws.Find(dlg.CountsColumn)!.NumericValues(), positive: false, out var counts, out var error))
+        { Log(error); return; }
         if (counts.Length < 2) { Log("Need at least 2 rows."); return; }
-        var chart = ControlCharts.NPChart(counts, dlg.ConstantSize);
-        OutputRaw(SpcFormatter.Chart(chart));
-        ShowGraph(chart.Title, p => Plots.ControlChart(p, chart));
+        try
+        {
+            var chart = ControlCharts.NPChart(counts, dlg.ConstantSize);
+            OutputRaw(SpcFormatter.Chart(chart));
+            ShowGraph(chart.Title, p => Plots.ControlChart(p, chart));
+        }
+        catch (Exception ex) { Log($"NP chart: {ex.Message}"); }
     }
 
     private void OnCChart(object sender, RoutedEventArgs e)
@@ -1415,11 +1533,16 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new AttributeChartWindow(numeric, "C Chart", needSizesColumn: false, needConstantSize: false) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var counts = IntColumn(ws, dlg.CountsColumn);
+        if (!TryCounts(ws.Find(dlg.CountsColumn)!.NumericValues(), positive: false, out var counts, out var error))
+        { Log(error); return; }
         if (counts.Length < 2) { Log("Need at least 2 rows."); return; }
-        var chart = ControlCharts.CChart(counts);
-        OutputRaw(SpcFormatter.Chart(chart));
-        ShowGraph(chart.Title, p => Plots.ControlChart(p, chart));
+        try
+        {
+            var chart = ControlCharts.CChart(counts);
+            OutputRaw(SpcFormatter.Chart(chart));
+            ShowGraph(chart.Title, p => Plots.ControlChart(p, chart));
+        }
+        catch (Exception ex) { Log($"C chart: {ex.Message}"); }
     }
 
     private void OnCapability(object sender, RoutedEventArgs e)
@@ -1430,10 +1553,14 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() != true) return;
         var v = ws.Find(dlg.DataColumn)!.NumericValues();
         if (v.Length < 2) { Log("Need at least 2 values."); return; }
-        var cap = Capability.FromIndividuals(v, dlg.Lsl, dlg.Usl, dlg.Target);
-        OutputRaw(SpcFormatter.Capability(cap));
-        ShowGraph($"Process Capability of {dlg.DataColumn}",
-            p => Plots.CapabilityHistogram(p, dlg.DataColumn, v, dlg.Lsl, dlg.Usl, dlg.Target));
+        try
+        {
+            var cap = Capability.FromIndividuals(v, dlg.Lsl, dlg.Usl, dlg.Target);
+            OutputRaw(SpcFormatter.Capability(cap));
+            ShowGraph($"Process Capability of {dlg.DataColumn}",
+                p => Plots.CapabilityHistogram(p, dlg.DataColumn, v, dlg.Lsl, dlg.Usl, dlg.Target));
+        }
+        catch (Exception ex) { Log($"Capability: {ex.Message}"); }
     }
 
     // ---- Graph menu (filled in phase 1) ------------------------------------

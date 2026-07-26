@@ -21,19 +21,32 @@ public static class AnovaExtensions
     public static TwoWayAnovaResult TwoWay(double[] response, string[] factorA, string[] factorB,
         string nameA = "A", string nameB = "B")
     {
+        ArgumentNullException.ThrowIfNull(response);
+        ArgumentNullException.ThrowIfNull(factorA);
+        ArgumentNullException.ThrowIfNull(factorB);
+        if (response.Length == 0 || factorA.Length != response.Length || factorB.Length != response.Length)
+            throw new ArgumentException("Response and factor arrays must be nonempty and have equal lengths.");
+        StatGuard.Finite(response, nameof(response));
+        if (factorA.Any(string.IsNullOrWhiteSpace) || factorB.Any(string.IsNullOrWhiteSpace))
+            throw new ArgumentException("Factor labels cannot be empty.");
+
         int N = response.Length;
         var aLevels = factorA.Distinct().OrderBy(s => s).ToList();
         var bLevels = factorB.Distinct().OrderBy(s => s).ToList();
         int a = aLevels.Count, b = bLevels.Count;
+        if (a < 2 || b < 2)
+            throw new ArgumentException("Each factor needs at least two levels.");
+        var aIndex = aLevels.Select((value, index) => (value, index)).ToDictionary(x => x.value, x => x.index);
+        var bIndex = bLevels.Select((value, index) => (value, index)).ToDictionary(x => x.value, x => x.index);
 
         var cell = new Dictionary<(int, int), List<double>>();
         for (int i = 0; i < a; i++) for (int j = 0; j < b; j++) cell[(i, j)] = new List<double>();
         for (int r = 0; r < N; r++)
-            cell[(aLevels.IndexOf(factorA[r]), bLevels.IndexOf(factorB[r]))].Add(response[r]);
+            cell[(aIndex[factorA[r]], bIndex[factorB[r]])].Add(response[r]);
 
         int n = cell[(0, 0)].Count;
-        if (cell.Values.Any(c => c.Count != n) || n < 1)
-            throw new ArgumentException("Two-way ANOVA requires a balanced design (equal observations per A×B cell).");
+        if (cell.Values.Any(c => c.Count != n) || n < 2)
+            throw new ArgumentException("Two-way ANOVA requires a balanced design with at least 2 observations per cell.");
 
         double grand = response.Average();
         double[] meanA = Enumerable.Range(0, a).Select(i => Enumerable.Range(0, b).SelectMany(j => cell[(i, j)]).Average()).ToArray();

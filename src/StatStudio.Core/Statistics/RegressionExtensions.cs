@@ -56,6 +56,10 @@ public static class RegressionExtensions
     public static StepwiseResult Stepwise(double[] y, double[][] predictors, IReadOnlyList<string> names,
         double alphaEnter = 0.15)
     {
+        StatGuard.Design(y, predictors, names);
+        if (predictors.Length == 0)
+            throw new ArgumentException("Stepwise selection needs at least one predictor.", nameof(predictors));
+        StatGuard.Probability(alphaEnter, nameof(alphaEnter));
         int k = predictors.Length;
         var inModel = new List<int>();
         var steps = new List<string>();
@@ -83,7 +87,10 @@ public static class RegressionExtensions
         if (inModel.Count == 0)
         {
             steps.Add("No predictor met the entry criterion.");
-            inModel.Add(EnumerableArgMin(y, predictors, names));
+            int fallback = EnumerableArgMin(y, predictors, names);
+            if (fallback < 0)
+                throw new ArgumentException("No nonsingular one-predictor model can be fit.", nameof(predictors));
+            inModel.Add(fallback);
         }
 
         var finalIdx = inModel.ToArray();
@@ -94,7 +101,7 @@ public static class RegressionExtensions
     private static int EnumerableArgMin(double[] y, double[][] predictors, IReadOnlyList<string> names)
     {
         // fallback: the single predictor with the best (lowest) p-value
-        int best = 0; double bestP = double.PositiveInfinity;
+        int best = -1; double bestP = double.PositiveInfinity;
         for (int i = 0; i < predictors.Length; i++)
         {
             try

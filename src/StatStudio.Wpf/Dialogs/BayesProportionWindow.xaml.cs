@@ -21,7 +21,9 @@ public partial class BayesProportionWindow : Window
         { Warn("Prior a and b must be positive."); return; }
         if (!TestOptions.ParseDouble(ThreshBox.Text, out var th) || th <= 0 || th >= 1) { Warn("Threshold must be in (0,1)."); return; }
         X = x; N = n; PriorA = a; PriorB = b; Threshold = th;
-        Confidence = TestOptions.ParseConf(ConfBox.Text);
+        if (!TestOptions.TryParseConf(ConfBox.Text, out var confidence))
+        { Warn("Confidence must be between 0 and 1 (or between 0 and 100 as a percent)."); return; }
+        Confidence = confidence;
         DialogResult = true;
     }
 

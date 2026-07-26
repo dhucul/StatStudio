@@ -163,6 +163,8 @@ public static class Calculator
 
         private int ResolveColumn(string name)
         {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new FormatException("Column name cannot be empty.");
             if ((name[0] == 'C' || name[0] == 'c') && int.TryParse(name[1..], out int cn) && cn >= 1 && cn <= _ws.ColumnCount)
                 return cn - 1;
             int byName = _ws.IndexOf(name);

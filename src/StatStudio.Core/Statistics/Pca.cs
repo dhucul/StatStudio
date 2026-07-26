@@ -14,9 +14,15 @@ public static class Pca
     /// </summary>
     public static PcaResult Compute(double[][] data, IReadOnlyList<string> names, bool correlation = true)
     {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(names);
         int n = data.Length;
         int p = names.Count;
         if (n < 2 || p < 2) throw new ArgumentException("PCA needs at least 2 observations and 2 variables.");
+        if (data.Any(row => row is null || row.Length != p))
+            throw new ArgumentException("Every PCA row must contain one value per variable.", nameof(data));
+        if (data.SelectMany(row => row).Any(v => !double.IsFinite(v)))
+            throw new ArgumentException("PCA values must be finite.", nameof(data));
 
         var means = new double[p];
         var sds = new double[p];
@@ -27,6 +33,8 @@ public static class Pca
             double ss = 0;
             for (int i = 0; i < n; i++) ss += (data[i][j] - means[j]) * (data[i][j] - means[j]);
             sds[j] = Math.Sqrt(ss / (n - 1));
+            if (correlation && sds[j] == 0)
+                throw new ArgumentException($"Variable '{names[j]}' has zero variance.");
         }
 
         var m = Matrix<double>.Build.Dense(p, p);

@@ -40,8 +40,11 @@ public partial class BayesNormalWindow : Window
             if (!TestOptions.ParseDouble(SigmaBox.Text, out var sg) || sg <= 0) { Warn("Known σ must be > 0."); return; }
             PriorMean = pm; PriorSd = ps; KnownSigma = sg;
         }
-        Threshold = TestOptions.ParseDouble(ThreshBox.Text, out var th) ? th : 0;
-        Confidence = TestOptions.ParseConf(ConfBox.Text);
+        if (!TestOptions.ParseDouble(ThreshBox.Text, out var th)) { Warn("Enter a finite threshold."); return; }
+        if (!TestOptions.TryParseConf(ConfBox.Text, out var confidence))
+        { Warn("Confidence must be between 0 and 1 (or between 0 and 100 as a percent)."); return; }
+        Threshold = th;
+        Confidence = confidence;
         DialogResult = true;
     }
 

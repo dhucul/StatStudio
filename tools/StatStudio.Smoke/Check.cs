@@ -6,6 +6,12 @@ internal static class Check
     public static int Passed;
     public static int Failed;
 
+    public static void Reset()
+    {
+        Passed = 0;
+        Failed = 0;
+    }
+
     public static void Section(string name) => Console.WriteLine($"\n== {name} ==");
 
     public static void True(bool cond, string label)
@@ -27,6 +33,23 @@ internal static class Check
 
     public static void Equal(string actual, string expected, string label) =>
         True(actual == expected, $"{label}  ('{actual}' == '{expected}')");
+
+    public static void Throws<TException>(Action action, string label) where TException : Exception
+    {
+        try
+        {
+            action();
+            True(false, $"{label} (no exception)");
+        }
+        catch (TException)
+        {
+            True(true, label);
+        }
+        catch (Exception ex)
+        {
+            True(false, $"{label} (threw {ex.GetType().Name})");
+        }
+    }
 
     public static int Summary()
     {

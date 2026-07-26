@@ -29,7 +29,7 @@ public partial class SarimaWindow : Window
             !Ord(SPBox.Text, 3, out var sp) || !Ord(SDBox.Text, 2, out var sd) || !Ord(SQBox.Text, 3, out var sq))
         { Warn("Orders must be small non-negative integers (p,q≤5; P,Q≤3; d,D≤2)."); return; }
         if (!TestOptions.ParseInt(SBox.Text, out var s) || s < 1) { Warn("Seasonal period must be ≥ 1."); return; }
-        if (!TestOptions.ParseInt(ForecastBox.Text, out var f) || f < 0) f = 0;
+        if (!TestOptions.ParseInt(ForecastBox.Text, out var f) || f < 0) { Warn("Forecast count must be nonnegative."); return; }
         P = p; D = d; Q = q; SP = sp; SD = sd; SQ = sq; Season = s; Forecasts = f;
         DialogResult = true;
     }

@@ -14,8 +14,10 @@ public partial class TwoWayAnovaWindow : Window
         foreach (var c in numeric) ResponseCombo.Items.Add(c);
         foreach (var c in allColumns) { FactorACombo.Items.Add(c); FactorBCombo.Items.Add(c); }
         ResponseCombo.SelectedIndex = 0;
-        FactorACombo.SelectedIndex = 0;
-        FactorBCombo.SelectedIndex = allColumns.Count > 1 ? 1 : 0;
+        int firstFactor = allColumns.ToList().FindIndex(c => c != Response);
+        FactorACombo.SelectedIndex = Math.Max(0, firstFactor);
+        int secondFactor = allColumns.ToList().FindIndex(c => c != Response && c != FactorA);
+        FactorBCombo.SelectedIndex = Math.Max(0, secondFactor);
     }
 
     private void OnOk(object sender, RoutedEventArgs e)
@@ -25,9 +27,10 @@ public partial class TwoWayAnovaWindow : Window
             MessageBox.Show("Pick a response and two factors.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (FactorA == FactorB)
+        if (FactorA == FactorB || Response == FactorA || Response == FactorB)
         {
-            MessageBox.Show("Choose two different factors.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Choose three different columns for the response and factors.", Title,
+                MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         DialogResult = true;

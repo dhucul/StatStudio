@@ -13,6 +13,11 @@ public static class GageRR
     public static GageRRResult Analyze(double[] measurement, string[] partLabels, string[] operatorLabels,
         double studyVarMultiplier = 6.0, double alphaToRemoveInteraction = 0.05)
     {
+        StatGuard.Finite(measurement, nameof(measurement));
+        if (!double.IsFinite(studyVarMultiplier) || studyVarMultiplier <= 0)
+            throw new ArgumentOutOfRangeException(nameof(studyVarMultiplier), "The study variation multiplier must be positive and finite.");
+        StatGuard.Probability(alphaToRemoveInteraction, nameof(alphaToRemoveInteraction));
+
         int p = partLabels.Distinct().Count();
         int o = operatorLabels.Distinct().Count();
         int n = measurement.Length;

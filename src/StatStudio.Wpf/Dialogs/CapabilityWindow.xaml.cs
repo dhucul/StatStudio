@@ -23,6 +23,10 @@ public partial class CapabilityWindow : Window
         Usl = TestOptions.ParseDouble(UslBox.Text, out var hi) ? hi : null;
         Target = TestOptions.ParseDouble(TargetBox.Text, out var t) ? t : null;
         if (Lsl is null && Usl is null) { Warn("Enter at least one spec limit (LSL or USL)."); return; }
+        if (Lsl is not null && Usl is not null && Lsl >= Usl) { Warn("LSL must be less than USL."); return; }
+        if (Target is not null &&
+            ((Lsl is not null && Target < Lsl) || (Usl is not null && Target > Usl)))
+        { Warn("Target must fall within the specification limits."); return; }
         DialogResult = true;
     }
 

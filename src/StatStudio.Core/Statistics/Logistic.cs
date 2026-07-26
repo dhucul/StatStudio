@@ -15,11 +15,14 @@ public static class Logistic
     public static LogisticResult Fit(double[] y, double[][] predictors, IReadOnlyList<string> predictorNames,
         string response = "Y")
     {
+        StatGuard.Design(y, predictors, predictorNames);
         int n = y.Length;
         int k = predictors.Length;
         int p = k + 1;
         if (n <= p) throw new ArgumentException($"Need more than {p} observations.");
         if (y.Any(v => v != 0 && v != 1)) throw new ArgumentException("Response must be binary (0/1).");
+        if (!y.Contains(0) || !y.Contains(1))
+            throw new ArgumentException("Response must contain both outcome classes.");
 
         var X = Matrix<double>.Build.Dense(n, p);
         for (int i = 0; i < n; i++) { X[i, 0] = 1; for (int j = 0; j < k; j++) X[i, j + 1] = predictors[j][i]; }
@@ -36,9 +39,11 @@ public static class Logistic
             var w = mu.Map(m => Math.Max(m * (1 - m), 1e-9));
             var Xt = X.Transpose();
             var xtwx = Xt * Matrix<double>.Build.DenseOfDiagonalVector(w) * X;
-            xtwxInv = xtwx.Inverse();
             var grad = Xt * (Y - mu);
-            var delta = xtwxInv * grad;
+            var solved = RobustLinearAlgebra.SolveSquare(
+                xtwx, grad, "Cannot fit logistic regression — the weighted design matrix is singular.");
+            var delta = solved.Solution;
+            xtwxInv = solved.Inverse;
             beta += delta;
             if (delta.AbsoluteMaximum() < 1e-10) { converged = true; iter++; break; }
         }

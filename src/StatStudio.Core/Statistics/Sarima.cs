@@ -18,15 +18,27 @@ public static class Sarima
     public static SarimaResult Fit(double[] series, int p, int d, int q,
         int sp, int sd, int sq, int s, int forecasts = 0, bool includeConstant = true)
     {
+        ArgumentNullException.ThrowIfNull(series);
         if (s < 1) throw new ArgumentException("Seasonal period must be ≥ 1.");
-        if (p < 0 || q < 0 || sp < 0 || sq < 0 || d < 0 || sd < 0)
-            throw new ArgumentException("Orders must be non-negative.");
+        if (p < 0 || q < 0 || sp < 0 || sq < 0 || d < 0 || sd < 0 ||
+            p > 5 || q > 5 || sp > 3 || sq > 3 || d > 2 || sd > 2)
+            throw new ArgumentException("SARIMA orders out of range (p,q <= 5; P,Q <= 3; d,D <= 2).");
+        if (forecasts < 0) throw new ArgumentOutOfRangeException(nameof(forecasts));
+        StatGuard.Finite(series, nameof(series));
 
         // Difference: regular d times, then seasonal D times — recording each stage for integration.
         var stages = new List<(int Lag, double[] Pre)>();
         var cur = series;
-        for (int i = 0; i < d; i++) { stages.Add((1, cur)); cur = Diff(cur, 1); }
-        for (int i = 0; i < sd; i++) { stages.Add((s, cur)); cur = Diff(cur, s); }
+        for (int i = 0; i < d; i++)
+        {
+            if (cur.Length <= 1) throw new ArgumentException("Series is too short for regular differencing.");
+            stages.Add((1, cur)); cur = Diff(cur, 1);
+        }
+        for (int i = 0; i < sd; i++)
+        {
+            if (cur.Length <= s) throw new ArgumentException("Series is too short for seasonal differencing.");
+            stages.Add((s, cur)); cur = Diff(cur, s);
+        }
         double[] w = cur;
         int m = w.Length;
 
@@ -192,13 +204,16 @@ public static class Sarima
             fc = integ;
         }
 
-        // psi-weight CI on the differenced scale (approximate at the original scale).
-        var psi = Psi(a, mm, h);
+        // Apply inverse differencing to the innovation impulse response.
+        var impulse = Psi(a, mm, h);
+        foreach (var stage in stages)
+            for (int i = stage.Lag; i < h; i++)
+                impulse[i] += impulse[i - stage.Lag];
         var lo = new double[h]; var hi = new double[h];
         double cumVar = 0;
         for (int step = 0; step < h; step++)
         {
-            cumVar += psi[step] * psi[step];
+            cumVar += impulse[step] * impulse[step];
             double half = 1.959964 * Math.Sqrt(sigma2 * cumVar);
             lo[step] = fc[step] - half; hi[step] = fc[step] + half;
         }

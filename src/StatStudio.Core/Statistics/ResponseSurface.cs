@@ -13,6 +13,7 @@ public static class ResponseSurface
         bool randomize = true, int seed = 12345)
     {
         if (k < 2 || k > 5) throw new ArgumentException("CCD supports 2..5 factors.");
+        if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
         int cube = 1 << k;
         double alpha = faceCentered ? 1.0 : Math.Pow(cube, 0.25);
 
@@ -38,6 +39,7 @@ public static class ResponseSurface
     public static RsmDesign BoxBehnken(int k, int centerPoints = 3, bool randomize = true, int seed = 12345)
     {
         if (k < 3 || k > 5) throw new ArgumentException("Box-Behnken supports 3..5 factors.");
+        if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
         var runs = new List<RsmRun>();
         int std = 0;
         for (int i = 0; i < k; i++)
@@ -57,6 +59,7 @@ public static class ResponseSurface
     public static RegressionResult Analyze(double[] y, double[][] factors, IReadOnlyList<string> names,
         string response = "Y")
     {
+        StatGuard.Design(y, factors, names);
         var (preds, termNames) = QuadraticTerms(factors, names);
         return Regression.Fit(y, preds, termNames, response);
     }
@@ -64,7 +67,16 @@ public static class ResponseSurface
     /// <summary>Linear, square, and two-way interaction columns for the quadratic model.</summary>
     public static (double[][] Predictors, string[] Names) QuadraticTerms(double[][] factors, IReadOnlyList<string> names)
     {
-        int k = factors.Length, n = factors[0].Length;
+        ArgumentNullException.ThrowIfNull(factors);
+        ArgumentNullException.ThrowIfNull(names);
+        int k = factors.Length;
+        if (k == 0 || names.Count != k)
+            throw new ArgumentException("Provide at least one named factor and matching names.");
+        int n = factors[0]?.Length ?? throw new ArgumentException("Factors cannot be null.", nameof(factors));
+        if (factors.Any(f => f is null || f.Length != n))
+            throw new ArgumentException("All factors must have equal lengths.", nameof(factors));
+        if (factors.SelectMany(f => f).Any(v => !double.IsFinite(v)))
+            throw new ArgumentException("Factor values must be finite.", nameof(factors));
         var preds = new List<double[]>();
         var nm = new List<string>();
         for (int j = 0; j < k; j++) { preds.Add(factors[j]); nm.Add(names[j]); }

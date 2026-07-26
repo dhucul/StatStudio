@@ -10,7 +10,13 @@ public static class Correlation
 {
     public static (double R, double P, int N) Pearson(double[] x, double[] y)
     {
-        int n = Math.Min(x.Length, y.Length);
+        ArgumentNullException.ThrowIfNull(x);
+        ArgumentNullException.ThrowIfNull(y);
+        if (x.Length != y.Length)
+            throw new ArgumentException("Correlation inputs must be row-aligned and equal length.");
+        StatGuard.Finite(x, nameof(x));
+        StatGuard.Finite(y, nameof(y));
+        int n = x.Length;
         if (n < 2) return (double.NaN, double.NaN, n);
         double mx = 0, my = 0;
         for (int i = 0; i < n; i++) { mx += x[i]; my += y[i]; }
@@ -27,7 +33,13 @@ public static class Correlation
 
     public static (double R, double P, int N) Spearman(double[] x, double[] y)
     {
-        int n = Math.Min(x.Length, y.Length);
+        ArgumentNullException.ThrowIfNull(x);
+        ArgumentNullException.ThrowIfNull(y);
+        if (x.Length != y.Length)
+            throw new ArgumentException("Correlation inputs must be row-aligned and equal length.");
+        StatGuard.Finite(x, nameof(x));
+        StatGuard.Finite(y, nameof(y));
+        int n = x.Length;
         if (n < 2) return (double.NaN, double.NaN, n);
         var rx = Ranking.Average(x.Take(n).ToArray());
         var ry = Ranking.Average(y.Take(n).ToArray());

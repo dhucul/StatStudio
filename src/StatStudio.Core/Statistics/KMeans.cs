@@ -10,8 +10,16 @@ public static class KMeans
     public static KMeansResult Cluster(double[][] data, int k, IReadOnlyList<string> names,
         int maxIter = 100, int seed = 12345)
     {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(names);
         int n = data.Length, p = names.Count;
         if (k < 2 || k > n) throw new ArgumentException("k must be between 2 and the number of observations.");
+        if (p < 1) throw new ArgumentException("Select at least one clustering variable.", nameof(names));
+        if (maxIter < 1) throw new ArgumentOutOfRangeException(nameof(maxIter));
+        if (data.Any(row => row is null || row.Length != p))
+            throw new ArgumentException("Every k-means row must contain one value per variable.", nameof(data));
+        if (data.SelectMany(row => row).Any(v => !double.IsFinite(v)))
+            throw new ArgumentException("K-means values must be finite.", nameof(data));
 
         var rnd = new Random(seed);
         var centroids = SeedPlusPlus(data, k, p, rnd);
@@ -41,8 +49,25 @@ public static class KMeans
                 for (int j = 0; j < p; j++) sum[assign[i]][j] += data[i][j];
             }
             for (int c = 0; c < k; c++)
-                if (cnt[c] > 0)
-                    for (int j = 0; j < p; j++) centroids[c][j] = sum[c][j] / cnt[c];
+            {
+                if (cnt[c] != 0) continue;
+                int farthest = Enumerable.Range(0, n)
+                    .Where(i => cnt[assign[i]] > 1)
+                    .OrderByDescending(i => Dist2(data[i], centroids[assign[i]]))
+                    .First();
+                int previous = assign[farthest];
+                assign[farthest] = c;
+                cnt[previous]--;
+                cnt[c] = 1;
+                for (int j = 0; j < p; j++)
+                {
+                    sum[previous][j] -= data[farthest][j];
+                    sum[c][j] = data[farthest][j];
+                }
+                changed = true;
+            }
+            for (int c = 0; c < k; c++)
+                for (int j = 0; j < p; j++) centroids[c][j] = sum[c][j] / cnt[c];
 
             if (!changed) { iter++; break; }
         }
@@ -68,6 +93,8 @@ public static class KMeans
                 for (int j = 0; j < c; j++) best = Math.Min(best, Dist2(data[i], centroids[j]));
                 d2[i] = best; total += best;
             }
+            if (!(total > 0) || !double.IsFinite(total))
+                throw new ArgumentException("The data contain fewer than k distinct observations.", nameof(data));
             double target = rnd.NextDouble() * total, acc = 0;
             int chosen = n - 1;
             for (int i = 0; i < n; i++) { acc += d2[i]; if (acc >= target) { chosen = i; break; } }

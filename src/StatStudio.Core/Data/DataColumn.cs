@@ -42,6 +42,7 @@ public sealed class DataColumn
 
     public void Set(int row, string? raw)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(row);
         while (_cells.Count <= row) _cells.Add(null);
         _cells[row] = Clean(raw);
     }
@@ -96,9 +97,17 @@ public sealed class DataColumn
         return any;
     }
 
-    internal static bool TryParse(string? s, out double value) =>
-        double.TryParse(s, NumberStyles.Float | NumberStyles.AllowThousands,
-            CultureInfo.InvariantCulture, out value);
+    internal static bool TryParse(string? s, out double value)
+    {
+        if (!double.TryParse(s, NumberStyles.Float | NumberStyles.AllowThousands,
+                CultureInfo.InvariantCulture, out value) ||
+            !double.IsFinite(value))
+        {
+            value = default;
+            return false;
+        }
+        return true;
+    }
 
     private static string? Clean(string? raw) => raw?.Trim();
 }

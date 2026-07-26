@@ -12,8 +12,22 @@ public static class MixtureAnalysis
 {
     public static MixtureResult Fit(double[] y, double[][] components, IReadOnlyList<string> names, bool quadratic)
     {
+        StatGuard.Design(y, components, names);
         int n = y.Length;
         int q = components.Length;
+        if (q < 2) throw new ArgumentException("Mixture analysis needs at least two components.");
+        for (int r = 0; r < n; r++)
+        {
+            double sum = 0;
+            for (int j = 0; j < q; j++)
+            {
+                if (components[j][r] < 0)
+                    throw new ArgumentException($"Run {r + 1} contains a negative mixture component.");
+                sum += components[j][r];
+            }
+            if (Math.Abs(sum - 1) > 1e-8)
+                throw new ArgumentException($"Run {r + 1} components must sum to 1.");
+        }
 
         var cols = new List<double[]>();
         var termNames = new List<string>();
@@ -35,10 +49,8 @@ public static class MixtureAnalysis
         for (int r = 0; r < n; r++) for (int c = 0; c < p; c++) X[r, c] = cols[c][r];
         var Y = Vector<double>.Build.DenseOfArray(y);
 
-        var XtXinv = (X.TransposeThisAndMultiply(X)).Inverse();
-        var beta = XtXinv * (X.TransposeThisAndMultiply(Y));
-        if (beta.Any(b => double.IsNaN(b) || double.IsInfinity(b)))
-            throw new ArgumentException("Cannot fit — the mixture design is singular for this model.");
+        var (beta, XtXinv) = RobustLinearAlgebra.LeastSquares(
+            X, Y, "Cannot fit — the mixture design is singular for this model.");
 
         var fitted = X * beta;
         var resid = Y - fitted;

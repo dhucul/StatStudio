@@ -13,13 +13,17 @@ public static class Normality
     /// </summary>
     public static AndersonDarlingResult AndersonDarling(double[] x)
     {
+        ArgumentNullException.ThrowIfNull(x);
         int n = x.Length;
-        if (n < 3) return new AndersonDarlingResult(n, double.NaN, double.NaN, double.NaN, double.NaN);
+        if (n < 3)
+            throw new ArgumentException("At least three observations are required.", nameof(x));
+        StatGuard.Finite(x, nameof(x));
 
         var s = x.OrderBy(v => v).ToArray();
         double mean = s.Average();
         double sd = Math.Sqrt(s.Sum(v => (v - mean) * (v - mean)) / (n - 1));
-        if (sd <= 0) return new AndersonDarlingResult(n, mean, sd, double.NaN, double.NaN);
+        if (sd <= 0)
+            throw new ArgumentException("The sample must contain variation.", nameof(x));
 
         double a2 = 0;
         for (int i = 0; i < n; i++)

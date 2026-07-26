@@ -35,12 +35,23 @@ internal static class SpcTests
         Check.Close(p.Center, 0.08, "p-bar");
         Check.Close(p.Ucl[0], 0.195104, "P UCL", 1e-3);
         Check.Close(p.Lcl[0], 0.0, "P LCL (clamped at 0)");
+        var boundedP = ControlCharts.PChart(new[] { 0, 1 }, new[] { 1, 1 });
+        Check.Close(boundedP.Ucl[0], 1, "P UCL clamped at 1");
+        var boundedNp = ControlCharts.NPChart(new[] { 0, 1 }, 1);
+        Check.Close(boundedNp.Ucl[0], 1, "NP UCL clamped at subgroup size");
 
         Check.Section("C chart  {5,3,4,6,2}");
         var c = ControlCharts.CChart(new[] { 5, 3, 4, 6, 2 });
         Check.Close(c.Center, 4.0, "c-bar");
         Check.Close(c.Ucl[0], 10.0, "C UCL (cbar + 3·sqrt(cbar))");
         Check.Close(c.Lcl[0], 0.0, "C LCL (clamped)");
+
+        var (centerline, _) = ControlCharts.IMR(Enumerable.Repeat(5.0, 10).ToArray());
+        Check.True(centerline.OutOfControl.All(flag => !flag), "centerline points do not trigger Nelson rule 2");
+        Check.Throws<ArgumentException>(
+            () => ControlCharts.PChart(new[] { 1, 2 }, new[] { 1, 1 }), "defectives greater than size rejected");
+        Check.Throws<ArgumentException>(
+            () => ControlCharts.UChart(new[] { 1, 2 }, new[] { 1 }), "attribute chart length mismatch rejected");
 
         Check.Section("Capability  LSL=0, USL=10");
         var cap = Capability.FromIndividuals(data, 0, 10);

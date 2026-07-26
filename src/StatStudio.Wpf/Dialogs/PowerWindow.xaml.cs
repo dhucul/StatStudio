@@ -46,7 +46,9 @@ public partial class PowerWindow : Window
 
     private void OnOk(object sender, RoutedEventArgs e)
     {
-        Alpha = TestOptions.ParseDouble(AlphaBox.Text, out var av) && av > 0 && av < 1 ? av : 0.05;
+        if (!TestOptions.ParseDouble(AlphaBox.Text, out var av) || av <= 0 || av >= 1)
+        { Warn("Alpha must be between 0 and 1."); return; }
+        Alpha = av;
         Alt = TestOptions.ParseAlt(AltCombo.SelectedIndex);
 
         if (TestCombo.SelectedIndex == 2)

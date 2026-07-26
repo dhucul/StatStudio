@@ -22,7 +22,7 @@ internal static class WorksheetGrid
             int n = 2;
             while (!used.Add(name)) name = $"{baseName}_{n++}";
             var dc = table.Columns.Add(name, typeof(string));
-            dc.Caption = col.Name;
+            dc.Caption = name;
         }
 
         int rows = ws.RowCount;
@@ -58,7 +58,7 @@ internal static class WorksheetGrid
 
         foreach (DataColumn dc in table.Columns)
         {
-            string name = string.IsNullOrEmpty(dc.Caption) ? dc.ColumnName : dc.Caption;
+            string name = dc.ColumnName;
             var col = ws.AddColumn(name);
             for (int r = 0; r <= last; r++)
             {

@@ -22,7 +22,8 @@ public static class DoeDesign
         bool randomize = true, int seed = 12345)
     {
         if (k < 2 || k > 7) throw new ArgumentException("Number of factors must be 2..7.");
-        if (replicates < 1) replicates = 1;
+        if (replicates < 1) throw new ArgumentOutOfRangeException(nameof(replicates));
+        if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
 
         int baseRuns = 1 << k;
         var corner = new List<double[]>(baseRuns);

@@ -26,6 +26,7 @@ public static class Regression
     public static RegressionResult Fit(double[] y, double[][] predictors,
         IReadOnlyList<string> predictorNames, string response = "Y")
     {
+        StatGuard.Design(y, predictors, predictorNames);
         int n = y.Length;
         int k = predictors.Length;          // number of predictors
         int p = k + 1;                      // params incl. intercept
@@ -39,12 +40,8 @@ public static class Regression
         }
         var Y = Vector<double>.Build.DenseOfArray(y);
 
-        var Xt = X.Transpose();
-        var XtXinv = (Xt * X).Inverse();
-        var beta = XtXinv * (Xt * Y);
-        if (beta.Any(b => double.IsNaN(b) || double.IsInfinity(b)))
-            throw new ArgumentException(
-                "Cannot fit the model — the predictors are constant or collinear (singular design matrix).");
+        var (beta, XtXinv) = RobustLinearAlgebra.LeastSquares(
+            X, Y, "Cannot fit the model — the predictors are constant or collinear (singular design matrix).");
         var fittedV = X * beta;
         var residV = Y - fittedV;
 

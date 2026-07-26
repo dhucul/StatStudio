@@ -13,6 +13,15 @@ public static class Capability
     /// </summary>
     public static CapabilityResult FromIndividuals(double[] values, double? lsl, double? usl, double? target = null)
     {
+        ArgumentNullException.ThrowIfNull(values);
+        if (values.Length < 2) throw new ArgumentException("Capability analysis needs at least 2 values.", nameof(values));
+        if (values.Any(v => !double.IsFinite(v))) throw new ArgumentException("Values must be finite.", nameof(values));
+        if (lsl is null && usl is null) throw new ArgumentException("At least one specification limit is required.");
+        if (lsl is not null && !double.IsFinite(lsl.Value)) throw new ArgumentOutOfRangeException(nameof(lsl));
+        if (usl is not null && !double.IsFinite(usl.Value)) throw new ArgumentOutOfRangeException(nameof(usl));
+        if (target is not null && !double.IsFinite(target.Value)) throw new ArgumentOutOfRangeException(nameof(target));
+        if (lsl is not null && usl is not null && lsl.Value >= usl.Value)
+            throw new ArgumentException("LSL must be less than USL.");
         int n = values.Length;
         double mean = values.Average();
         double sigmaOverall = StdDev(values);

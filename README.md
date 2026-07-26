@@ -58,7 +58,8 @@ that is converted to a Core `Worksheet` whenever an analysis runs.
 ```
 dotnet build StatStudio.slnx
 dotnet run  --project src/StatStudio.Wpf
-dotnet run  --project tools/StatStudio.Smoke      # 294 numeric checks vs reference values
+dotnet test StatStudio.slnx
+dotnet run  --project tools/StatStudio.Smoke      # optional verbose smoke output
 ```
 
 `StatStudio.Wpf --demo` loads a sample dataset and runs a few analyses (see `ProcessArgs` for the
@@ -68,7 +69,7 @@ dotnet run  --project tools/StatStudio.Smoke      # 294 numeric checks vs refere
 
 ```
 powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1   # -> dist/StatStudioSetup.exe
-powershell -ExecutionPolicy Bypass -File tools/e2e-install.ps1           # install -> launch -> uninstall
+powershell -ExecutionPolicy Bypass -File tools/e2e-install.ps1 -InstallDir C:\temp\StatStudio-e2e
 ```
 
 Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
@@ -80,5 +81,5 @@ ANOVA/regression (incl. logistic), the full DOE suite (factorial, fractional, re
 mixture), SPC + capability + Gage R&R, the full time-series suite (smoothing, decomposition,
 ARIMA/SARIMA), multivariate (PCA, factor analysis, clustering), reliability/survival, power &
 sample size, conjugate Bayesian inference, one-way mixed/hierarchical models, and a worksheet
-calculator — all engine-verified by 294 reference checks. The engine-per-analysis + dialog +
+calculator — all engine-verified by the discoverable smoke test suite. The engine-per-analysis + dialog +
 Session-output design keeps further additions incremental.

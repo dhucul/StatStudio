@@ -25,6 +25,15 @@ public static class Bayes
     public static BayesProportionResult Proportion(int x, int n, double priorA = 1, double priorB = 1,
         double conf = 0.95, double threshold = 0.5)
     {
+        if (n <= 0 || x < 0 || x > n)
+            throw new ArgumentOutOfRangeException(nameof(x), "Successes must be between zero and a positive number of trials.");
+        if (!double.IsFinite(priorA) || priorA <= 0)
+            throw new ArgumentOutOfRangeException(nameof(priorA), "The beta prior parameters must be positive and finite.");
+        if (!double.IsFinite(priorB) || priorB <= 0)
+            throw new ArgumentOutOfRangeException(nameof(priorB), "The beta prior parameters must be positive and finite.");
+        StatGuard.Probability(conf, nameof(conf));
+        StatGuard.UnitInterval(threshold, nameof(threshold));
+
         double pa = priorA + x, pb = priorB + (n - x);
         var beta = new Beta(pa, pb);
         double mean = pa / (pa + pb);
@@ -41,9 +50,20 @@ public static class Bayes
     public static BayesNormalMeanResult NormalMeanKnownVar(double[] data, double priorMean, double priorSd,
         double knownSigma, double conf = 0.95, double threshold = 0)
     {
+        RequireNormalData(data, 1);
+        if (!double.IsFinite(priorMean))
+            throw new ArgumentOutOfRangeException(nameof(priorMean), "The prior mean must be finite.");
+        if (!double.IsFinite(priorSd) || priorSd <= 0)
+            throw new ArgumentOutOfRangeException(nameof(priorSd), "The prior standard deviation must be positive and finite.");
+        if (!double.IsFinite(knownSigma) || knownSigma <= 0)
+            throw new ArgumentOutOfRangeException(nameof(knownSigma), "The known standard deviation must be positive and finite.");
+        StatGuard.Probability(conf, nameof(conf));
+        if (!double.IsFinite(threshold))
+            throw new ArgumentOutOfRangeException(nameof(threshold), "The threshold must be finite.");
+
         int n = data.Length;
         double xbar = data.Average();
-        double priorPrec = priorSd > 0 ? 1 / (priorSd * priorSd) : 0;
+        double priorPrec = 1 / (priorSd * priorSd);
         double dataPrec = n / (knownSigma * knownSigma);
         double postVar = 1 / (priorPrec + dataPrec);
         double postMean = (priorMean * priorPrec + xbar * dataPrec) * postVar;
@@ -57,9 +77,16 @@ public static class Bayes
     /// <summary>Normal mean with unknown variance, Jeffreys prior → Student-t posterior for μ.</summary>
     public static BayesNormalMeanResult NormalMeanUnknownVar(double[] data, double conf = 0.95, double threshold = 0)
     {
+        RequireNormalData(data, 2);
+        StatGuard.Probability(conf, nameof(conf));
+        if (!double.IsFinite(threshold))
+            throw new ArgumentOutOfRangeException(nameof(threshold), "The threshold must be finite.");
+
         int n = data.Length;
         double xbar = data.Average();
         double s = Math.Sqrt(data.Sum(v => (v - xbar) * (v - xbar)) / (n - 1));
+        if (s <= 0)
+            throw new ArgumentException("The sample must contain variation.", nameof(data));
         double scale = s / Math.Sqrt(n);
         double df = n - 1;
         var t = new StudentT(0, 1, df);
@@ -73,7 +100,10 @@ public static class Bayes
     public static BayesRegressionResult LinearRegression(double[] y, double[][] predictors,
         IReadOnlyList<string> predictorNames, string response = "Y", double conf = 0.95)
     {
+        StatGuard.Probability(conf, nameof(conf));
         var reg = Regression.Fit(y, predictors, predictorNames, response);
+        if (reg.DfError <= 0)
+            throw new ArgumentException("Bayesian regression requires positive residual degrees of freedom.", nameof(y));
         var t = new StudentT(0, 1, reg.DfError);
         double tc = t.InverseCumulativeDistribution(1 - (1 - conf) / 2);
 
@@ -86,5 +116,13 @@ public static class Bayes
                 term.Coef - tc * se, term.Coef + tc * se, probPos));
         }
         return new BayesRegressionResult(response, predictorNames, terms, reg.S, reg.DfError, conf);
+    }
+
+    private static void RequireNormalData(double[] data, int minimum)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data.Length < minimum)
+            throw new ArgumentException($"At least {minimum} observation(s) are required.", nameof(data));
+        StatGuard.Finite(data, nameof(data));
     }
 }

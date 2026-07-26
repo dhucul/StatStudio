@@ -31,16 +31,32 @@ public static class ProjectStore
         var dto = new ProjectDto { Name = ws.Name };
         foreach (var c in ws.Columns)
             dto.Columns.Add(new ColumnDto { Name = c.Name, Type = c.Type, Cells = c.Cells.ToList() });
-        File.WriteAllText(path, JsonSerializer.Serialize(dto, Options));
+        string temporaryPath = AtomicFile.CreateTemporaryPath(path);
+        try
+        {
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(dto, Options));
+            AtomicFile.Commit(temporaryPath, path);
+        }
+        finally
+        {
+            AtomicFile.DeleteIfPresent(temporaryPath);
+        }
     }
 
     public static Worksheet Load(string path)
     {
         var dto = JsonSerializer.Deserialize<ProjectDto>(File.ReadAllText(path), Options)
-                  ?? new ProjectDto();
+                  ?? throw new InvalidDataException("Project root cannot be null.");
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            throw new InvalidDataException("Project name cannot be empty.");
+        if (dto.Columns is null)
+            throw new InvalidDataException("Project columns cannot be null.");
+
         var ws = new Worksheet { Name = dto.Name };
         foreach (var cd in dto.Columns)
         {
+            if (cd is null || string.IsNullOrWhiteSpace(cd.Name) || cd.Cells is null)
+                throw new InvalidDataException("Project contains an invalid column.");
             var col = ws.AddColumn(cd.Name, cd.Type);
             foreach (var v in cd.Cells) col.Add(v);
         }

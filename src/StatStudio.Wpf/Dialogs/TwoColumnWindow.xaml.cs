@@ -30,8 +30,19 @@ public partial class TwoColumnWindow : Window
             MessageBox.Show("Pick both columns.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+        if (Column1 == Column2)
+        {
+            MessageBox.Show("Choose two different columns.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (!TestOptions.TryParseConf(ConfBox.Text, out var confidence))
+        {
+            MessageBox.Show("Confidence must be between 0 and 1 (or between 0 and 100 as a percent).", Title,
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         Alt = TestOptions.ParseAlt(AltCombo.SelectedIndex);
-        Confidence = TestOptions.ParseConf(ConfBox.Text);
+        Confidence = confidence;
         DialogResult = true;
     }
 }

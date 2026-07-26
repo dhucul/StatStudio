@@ -25,12 +25,16 @@ internal static class TimeSeriesTests
         Check.Close(ma.Fitted[1], 2.0, "MA at index 1");
         Check.Close(ma.Fitted[2], 3.0, "MA at index 2");
         Check.Close(ma.Fitted[3], 4.0, "MA at index 3");
+        var wholeWindow = TimeSeries.MovingAverage(new double[] { 1, 2, 3 }, 3);
+        Check.True(double.IsFinite(wholeWindow.Fitted[1]), "MA length may equal series length");
 
         Check.Section("Single exponential smoothing  {2,4,6}, alpha=0.5");
         var ses = TimeSeries.SingleExp(new double[] { 2, 4, 6 }, 0.5, forecasts: 1);
         Check.Close(ses.Fitted[1], 2.0, "fitted[1] = level1");
         Check.Close(ses.Fitted[2], 3.0, "fitted[2] = level2");
         Check.Close(ses.Forecasts[0], 4.5, "forecast = level3");
+        var zeroActual = TimeSeries.SingleExp(new double[] { 10, 0, 10 }, 0.5);
+        Check.Close(zeroActual.Accuracy.Mape, 50, "MAPE excludes zero actuals from its denominator");
 
         Check.Section("Double exponential smoothing (increasing series)");
         var des = TimeSeries.DoubleExp(new double[] { 1, 2, 3, 4, 5 }, 0.5, 0.5, forecasts: 2);
@@ -69,6 +73,11 @@ internal static class TimeSeriesTests
         Check.Close(ima.Forecasts[0], 11.0, "forecast t=11", 1e-4);
         Check.Close(ima.Forecasts[2], 13.0, "forecast t=13", 1e-4);
 
+        var integrated = new double[] { 0, 1, 3, 4, 7, 9, 12, 16, 17, 21, 24, 30 };
+        var randomWalk = Arima.Fit(integrated, 0, 1, 0, forecasts: 4);
+        var rwWidths = randomWalk.ForecastUpper.Zip(randomWalk.ForecastLower, (hi, lo) => hi - lo).ToArray();
+        Check.True(rwWidths[3] > 1.9 * rwWidths[0], "ARIMA d=1 interval accumulates uncertainty");
+
         Check.Section("ARIMA(0,0,1) MA fit (reasonableness)");
         var rnd = new Random(1);
         var noisy = Enumerable.Range(0, 60).Select(_ => rnd.NextDouble() * 2 - 1).ToArray();
@@ -86,8 +95,29 @@ internal static class TimeSeriesTests
         Check.Close(sar.Forecasts[2], 30, "forecast season 3", 1e-6);
         Check.Close(sar.Forecasts[3], 40, "forecast season 4", 1e-6);
 
+        var seasonalWalk = new double[24];
+        seasonalWalk[0] = 10; seasonalWalk[1] = 20; seasonalWalk[2] = 30; seasonalWalk[3] = 40;
+        var seasonalChanges = new double[] { 1, 3, 2, 5, 4, 2, 6, 3, 5, 1, 4, 7, 2, 5, 3, 6, 4, 8, 2, 7 };
+        for (int i = 4; i < seasonalWalk.Length; i++)
+            seasonalWalk[i] = seasonalWalk[i - 4] + seasonalChanges[i - 4];
+        var seasonalRandomWalk = Sarima.Fit(seasonalWalk, 0, 0, 0, 0, 1, 0, 4,
+            forecasts: 8, includeConstant: false);
+        var seasonalWidths = seasonalRandomWalk.ForecastUpper
+            .Zip(seasonalRandomWalk.ForecastLower, (hi, lo) => hi - lo).ToArray();
+        Check.True(seasonalWidths[4] > 1.3 * seasonalWidths[0], "SARIMA D=1 interval accumulates seasonal uncertainty");
+
         Check.Section("SARIMA(1,0,0)(0,0,0)_1 reduces to AR(1)");
         var sar2 = Sarima.Fit(line, 1, 0, 0, 0, 0, 0, 1);
         Check.Close(sar2.Terms.First(t => t.Name == "AR(1)").Coef, 1.0, "AR(1) ~ 1", 0.05);
+
+        Check.Section("Time-series boundary contracts");
+        Check.Throws<ArgumentOutOfRangeException>(
+            () => TimeSeries.Autocorrelation(new double[] { 1, 2, 3 }, -1), "negative max lag rejected");
+        Check.Throws<ArgumentOutOfRangeException>(
+            () => TimeSeries.SingleExp(new double[] { 1, 2 }, 1.1), "invalid smoothing coefficient rejected");
+        Check.Throws<ArgumentException>(
+            () => TimeSeries.QuadraticTrend(new double[] { 1, 2, 3 }), "three-point quadratic rejected");
+        Check.Throws<ArgumentOutOfRangeException>(
+            () => Arima.Fit(line, 1, 0, 0, forecasts: -1), "negative ARIMA forecast count rejected");
     }
 }

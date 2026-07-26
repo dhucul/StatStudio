@@ -46,6 +46,9 @@ public static class ControlCharts
 
     public static (SpcChart Individuals, SpcChart MovingRange) IMR(double[] values)
     {
+        ArgumentNullException.ThrowIfNull(values);
+        if (values.Length < 2) throw new ArgumentException("I-MR chart needs at least 2 values.", nameof(values));
+        if (values.Any(v => !double.IsFinite(v))) throw new ArgumentException("Values must be finite.", nameof(values));
         int m = values.Length;
         var mr = new double[m - 1];
         for (int i = 1; i < m; i++) mr[i - 1] = Math.Abs(values[i] - values[i - 1]);
@@ -65,6 +68,7 @@ public static class ControlCharts
 
     public static SpcChart PChart(int[] defectives, int[] sizes)
     {
+        RequirePairedCounts(defectives, sizes, defectivesCannotExceedSize: true);
         int k = defectives.Length;
         double totalD = defectives.Sum();
         double totalN = sizes.Sum();
@@ -77,7 +81,7 @@ public static class ControlCharts
         {
             p[i] = (double)defectives[i] / sizes[i];
             double sigma = Math.Sqrt(pbar * (1 - pbar) / sizes[i]);
-            ucl[i] = pbar + 3 * sigma;
+            ucl[i] = Math.Min(1, pbar + 3 * sigma);
             lcl[i] = Math.Max(0, pbar - 3 * sigma);
         }
         return Build("P Chart", "Proportion", pbar, p, ucl, lcl);
@@ -85,17 +89,22 @@ public static class ControlCharts
 
     public static SpcChart NPChart(int[] defectives, int n)
     {
+        if (n <= 0) throw new ArgumentOutOfRangeException(nameof(n));
+        RequireCounts(defectives, nameof(defectives));
+        if (defectives.Any(d => d > n))
+            throw new ArgumentException("Defectives cannot exceed sample size.", nameof(defectives));
         int k = defectives.Length;
         var counts = defectives.Select(d => (double)d).ToArray();
         double npbar = counts.Average();
         double pbar = npbar / n;
         double sigma = Math.Sqrt(npbar * (1 - pbar));
         return Build("NP Chart", "Count", npbar, counts,
-            npbar + 3 * sigma, Math.Max(0, npbar - 3 * sigma));
+            Math.Min(n, npbar + 3 * sigma), Math.Max(0, npbar - 3 * sigma));
     }
 
     public static SpcChart CChart(int[] counts)
     {
+        RequireCounts(counts, nameof(counts));
         var c = counts.Select(v => (double)v).ToArray();
         double cbar = c.Average();
         double sigma = Math.Sqrt(cbar);
@@ -105,6 +114,7 @@ public static class ControlCharts
 
     public static SpcChart UChart(int[] counts, int[] sizes)
     {
+        RequirePairedCounts(counts, sizes, defectivesCannotExceedSize: false);
         int k = counts.Length;
         double ubar = (double)counts.Sum() / sizes.Sum();
         var u = new double[k];
@@ -146,11 +156,12 @@ public static class ControlCharts
         }
 
         // Nelson Test 2: nine consecutive points on the same side of the center line.
-        int run = 0; bool above = false;
+        int run = 0, previousSide = 0;
         for (int i = 0; i < k; i++)
         {
-            bool a = values[i] > center;
-            if (i == 0 || a != above) { run = 1; above = a; }
+            int side = Math.Sign(values[i] - center);
+            if (side == 0) { run = 0; previousSide = 0; continue; }
+            if (side != previousSide) { run = 1; previousSide = side; }
             else run++;
             if (run >= 9)
                 for (int j = i - 8; j <= i; j++) { ooc[j] = true; signals[j] = AddSignal(signals[j], "2"); }
@@ -169,9 +180,30 @@ public static class ControlCharts
         if (n < 2) throw new ArgumentException("Subgroups must have size >= 2.");
         if (subgroups.Any(g => g.Length != n))
             throw new ArgumentException("All subgroups must have the same size for this chart.");
+        if (subgroups.SelectMany(g => g).Any(v => !double.IsFinite(v)))
+            throw new ArgumentException("Subgroup values must be finite.", nameof(subgroups));
         if (!SpcConstants.Supports(n))
             throw new ArgumentException($"Subgroup size {n} is unsupported (2..10).");
         return n;
+    }
+
+    private static void RequireCounts(int[] counts, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+        if (counts.Length < 2) throw new ArgumentException("Chart needs at least 2 rows.", paramName);
+        if (counts.Any(v => v < 0)) throw new ArgumentException("Counts must be non-negative.", paramName);
+    }
+
+    private static void RequirePairedCounts(int[] counts, int[] sizes, bool defectivesCannotExceedSize)
+    {
+        RequireCounts(counts, nameof(counts));
+        ArgumentNullException.ThrowIfNull(sizes);
+        if (sizes.Length != counts.Length)
+            throw new ArgumentException("Counts and sample sizes must have equal lengths.", nameof(sizes));
+        if (sizes.Any(v => v <= 0))
+            throw new ArgumentException("Sample sizes must be positive.", nameof(sizes));
+        if (defectivesCannotExceedSize && counts.Where((value, index) => value > sizes[index]).Any())
+            throw new ArgumentException("Defectives cannot exceed sample size.", nameof(counts));
     }
 
     private static double StdDev(double[] x)

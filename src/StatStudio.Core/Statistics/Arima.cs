@@ -20,8 +20,13 @@ public static class Arima
     public static ArimaResult Fit(double[] series, int p, int d, int q,
         int forecasts = 0, bool includeConstant = true)
     {
+        ArgumentNullException.ThrowIfNull(series);
         if (p < 0 || q < 0 || d < 0 || p > 5 || q > 5 || d > 2)
             throw new ArgumentException("ARIMA orders out of range (p,q ≤ 5, d ≤ 2).");
+        if (forecasts < 0) throw new ArgumentOutOfRangeException(nameof(forecasts));
+        StatGuard.Finite(series, nameof(series));
+        if (series.Length <= d)
+            throw new ArgumentException("Series is too short for the requested differencing order.", nameof(series));
 
         double[] w = series;
         for (int i = 0; i < d; i++) w = Diff(w);
@@ -107,8 +112,8 @@ public static class Arima
             for (int i = 1; i <= p; i++) X[r, col++] = w[t - i];
             Y[r] = w[t];
         }
-        var beta = (X.TransposeThisAndMultiply(X)).Inverse() * (X.TransposeThisAndMultiply(Y));
-        return beta.ToArray();
+        return RobustLinearAlgebra.LeastSquares(
+            X, Y, "Cannot fit ARIMA — the autoregressive design is singular.").Solution.ToArray();
     }
 
     private static double[] StdErrors(double[] w, double[] theta, int p, int q, bool c, double sigma2, int nParams)
@@ -173,14 +178,17 @@ public static class Arima
             fc[step] = v;
         }
 
-        // Forecast-error variance from psi-weights of the (differenced) ARMA model.
-        var psi = PsiWeights(theta, p, q, c, h);
+        // Forecast-error variance after applying every inverse differencing filter.
+        var impulse = PsiWeights(theta, p, q, c, h);
+        for (int level = 0; level < d; level++)
+            for (int i = 1; i < h; i++)
+                impulse[i] += impulse[i - 1];
         var lo = new double[h];
         var hi = new double[h];
         double cumVar = 0;
         for (int step = 0; step < h; step++)
         {
-            cumVar += psi[step] * psi[step];
+            cumVar += impulse[step] * impulse[step];
             double half = 1.959964 * Math.Sqrt(sigma2 * cumVar);
             lo[step] = fc[step] - half;
             hi[step] = fc[step] + half;

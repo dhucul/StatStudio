@@ -9,9 +9,19 @@ $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 try
 {
+    $publish = [System.IO.Path]::GetFullPath((Join-Path $root 'dist\publish'))
+    $distRoot = [System.IO.Path]::GetFullPath((Join-Path $root 'dist')) +
+        [System.IO.Path]::DirectorySeparatorChar
+    if (-not $publish.StartsWith($distRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clean a publish directory outside dist: $publish"
+    }
+    if (Test-Path -LiteralPath $publish) {
+        Remove-Item -LiteralPath $publish -Recurse -Force
+    }
+
     Write-Host "==> Publishing self-contained build..." -ForegroundColor Cyan
     dotnet publish src/StatStudio.Wpf/StatStudio.Wpf.csproj `
-        -c Release -r win-x64 --self-contained true -o dist/publish
+        -c Release -r win-x64 --self-contained true -o $publish
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 
     $candidates = @(

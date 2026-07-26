@@ -16,8 +16,14 @@ public static class VarianceTests
     /// <summary>F-test for the ratio of two variances (two-sided), with a CI for σ1²/σ2².</summary>
     public static FTestResult FTest(double[] x1, double[] x2, double conf = 0.95)
     {
+        RequireSample(x1, nameof(x1));
+        RequireSample(x2, nameof(x2));
+        StatGuard.Probability(conf, nameof(conf));
+
         int n1 = x1.Length, n2 = x2.Length;
         double v1 = Variance(x1), v2 = Variance(x2);
+        if (v1 <= 0 || v2 <= 0)
+            throw new ArgumentException("Both samples must contain variation.");
         double f = v1 / v2;
         int df1 = n1 - 1, df2 = n2 - 1;
         var dist = new FisherSnedecor(df1, df2);
@@ -35,7 +41,10 @@ public static class VarianceTests
     /// <summary>Test for equal variances across k groups: Bartlett (normal) and Levene/Brown-Forsythe (robust).</summary>
     public static EqualVarianceResult EqualVariances(IReadOnlyList<(string Name, double[] Values)> groups)
     {
-        var used = groups.Where(g => g.Values.Length > 1).ToList();
+        ArgumentNullException.ThrowIfNull(groups);
+        foreach (var group in groups)
+            RequireSample(group.Values, nameof(groups));
+        var used = groups.ToList();
         int k = used.Count;
         if (k < 2) throw new ArgumentException("Need at least two groups with >1 observation.");
 
@@ -43,6 +52,8 @@ public static class VarianceTests
         var stats = used.Select(g => (g.Name, g.Values.Length, Math.Sqrt(Variance(g.Values)))).ToList();
 
         // Bartlett
+        if (used.Any(g => Variance(g.Values) <= 0))
+            throw new ArgumentException("Every group must contain variation.", nameof(groups));
         double pooledVar = used.Sum(g => (g.Values.Length - 1) * Variance(g.Values)) / (N - k);
         double sumLn = used.Sum(g => (g.Values.Length - 1) * Math.Log(Variance(g.Values)));
         double bNum = (N - k) * Math.Log(pooledVar) - sumLn;
@@ -69,6 +80,14 @@ public static class VarianceTests
         double m = x.Average(), ss = 0;
         foreach (var v in x) ss += (v - m) * (v - m);
         return ss / (n - 1);
+    }
+
+    private static void RequireSample(double[] values, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        if (values.Length < 2)
+            throw new ArgumentException("At least two observations are required.", paramName);
+        StatGuard.Finite(values, paramName);
     }
 
     private static double Median(double[] x)

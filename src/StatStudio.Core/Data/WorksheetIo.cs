@@ -22,20 +22,29 @@ public static class WorksheetIo
     public static Worksheet ReadCsv(TextReader reader, bool? hasHeader = null)
     {
         var text = reader.ReadToEnd();
-        var lines = SplitLines(text);
-        if (lines.Count == 0) return new Worksheet();
+        if (text.Length == 0) return new Worksheet();
 
-        char delim = DetectDelimiter(lines[0]);
-        var rows = lines.Select(l => ParseLine(l, delim)).ToList();
+        char delim = DetectDelimiter(FirstRecord(text));
+        var rows = ParseRecords(text, delim);
+        if (rows.Count == 0) return new Worksheet();
 
         bool header = hasHeader ?? LooksLikeHeader(rows);
         return FromRows(rows, header);
     }
 
-    public static void WriteCsv(Worksheet ws, string path)
+    public static void WriteCsv(Worksheet ws, string path, char delim = ',')
     {
-        using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
-        WriteCsv(ws, writer);
+        string temporaryPath = AtomicFile.CreateTemporaryPath(path);
+        try
+        {
+            using (var writer = new StreamWriter(temporaryPath, false, new UTF8Encoding(false)))
+                WriteCsv(ws, writer, delim);
+            AtomicFile.Commit(temporaryPath, path);
+        }
+        finally
+        {
+            AtomicFile.DeleteIfPresent(temporaryPath);
+        }
     }
 
     public static void WriteCsv(Worksheet ws, TextWriter writer, char delim = ',')
@@ -74,24 +83,33 @@ public static class WorksheetIo
 
     public static void WriteXlsx(Worksheet ws, string path)
     {
-        using var wb = new XLWorkbook();
-        var sheet = wb.AddWorksheet(SafeSheetName(ws.Name));
-        for (int j = 0; j < ws.ColumnCount; j++)
-            sheet.Cell(1, j + 1).Value = ws.Columns[j].Name;
-
-        for (int r = 0; r < ws.RowCount; r++)
+        string temporaryPath = AtomicFile.CreateTemporaryPath(path);
+        try
+        {
+            using var wb = new XLWorkbook();
+            var sheet = wb.AddWorksheet(SafeSheetName(ws.Name));
             for (int j = 0; j < ws.ColumnCount; j++)
-            {
-                var raw = ws.Columns[j][r];
-                if (string.IsNullOrEmpty(raw)) continue;
-                if (ws.Columns[j].Type == ColumnType.Numeric && DataColumn.TryParse(raw, out var num))
-                    sheet.Cell(r + 2, j + 1).Value = num;
-                else
-                    sheet.Cell(r + 2, j + 1).Value = raw;
-            }
-        sheet.Row(1).Style.Font.Bold = true;
-        sheet.Columns().AdjustToContents();
-        wb.SaveAs(path);
+                sheet.Cell(1, j + 1).Value = ws.Columns[j].Name;
+
+            for (int r = 0; r < ws.RowCount; r++)
+                for (int j = 0; j < ws.ColumnCount; j++)
+                {
+                    var raw = ws.Columns[j][r];
+                    if (string.IsNullOrEmpty(raw)) continue;
+                    if (ws.Columns[j].Type == ColumnType.Numeric && DataColumn.TryParse(raw, out var num))
+                        sheet.Cell(r + 2, j + 1).Value = num;
+                    else
+                        sheet.Cell(r + 2, j + 1).Value = raw;
+                }
+            sheet.Row(1).Style.Font.Bold = true;
+            sheet.Columns().AdjustToContents();
+            wb.SaveAs(temporaryPath);
+            AtomicFile.Commit(temporaryPath, path);
+        }
+        finally
+        {
+            AtomicFile.DeleteIfPresent(temporaryPath);
+        }
     }
 
     private static string SafeSheetName(string name)
@@ -161,43 +179,106 @@ public static class WorksheetIo
         int bestCount = -1;
         foreach (var d in Delimiters)
         {
-            int c = line.Count(ch => ch == d);
+            int c = CountOutsideQuotes(line, d);
             if (c > bestCount) { bestCount = c; best = d; }
         }
         return best;
     }
 
-    private static List<string> SplitLines(string text)
+    private static string FirstRecord(string text)
     {
-        var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').ToList();
-        while (lines.Count > 0 && lines[^1].Length == 0) lines.RemoveAt(lines.Count - 1);
-        return lines;
+        bool inQuotes = false;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == '"')
+            {
+                if (inQuotes && i + 1 < text.Length && text[i + 1] == '"') { i++; continue; }
+                inQuotes = !inQuotes;
+            }
+            else if (!inQuotes && (c == '\r' || c == '\n'))
+            {
+                return text[..i];
+            }
+        }
+        return text;
     }
 
-    /// <summary>Splits one line on the delimiter, honoring double-quoted fields with "" escapes.</summary>
-    private static List<string> ParseLine(string line, char delim)
+    private static int CountOutsideQuotes(string record, char delim)
     {
+        bool inQuotes = false;
+        int count = 0;
+        for (int i = 0; i < record.Length; i++)
+        {
+            char c = record[i];
+            if (c == '"')
+            {
+                if (inQuotes && i + 1 < record.Length && record[i + 1] == '"') { i++; continue; }
+                inQuotes = !inQuotes;
+            }
+            else if (!inQuotes && c == delim) count++;
+        }
+        return count;
+    }
+
+    /// <summary>Parses delimited records while preserving CR/LF inside quoted fields.</summary>
+    private static List<List<string>> ParseRecords(string text, char delim)
+    {
+        var rows = new List<List<string>>();
         var fields = new List<string>();
         var sb = new StringBuilder();
         bool inQuotes = false;
-        for (int i = 0; i < line.Length; i++)
+
+        void EndField()
         {
-            char c = line[i];
+            fields.Add(sb.ToString());
+            sb.Clear();
+        }
+
+        void EndRecord()
+        {
+            EndField();
+            rows.Add(new List<string>(fields));
+            fields.Clear();
+        }
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
             if (inQuotes)
             {
                 if (c == '"')
                 {
-                    if (i + 1 < line.Length && line[i + 1] == '"') { sb.Append('"'); i++; }
+                    if (i + 1 < text.Length && text[i + 1] == '"') { sb.Append('"'); i++; }
                     else inQuotes = false;
                 }
                 else sb.Append(c);
             }
-            else if (c == '"') inQuotes = true;
-            else if (c == delim) { fields.Add(sb.ToString()); sb.Clear(); }
-            else sb.Append(c);
+            else if (c == '"')
+            {
+                inQuotes = true;
+            }
+            else if (c == delim)
+            {
+                EndField();
+            }
+            else if (c == '\r' || c == '\n')
+            {
+                EndRecord();
+                if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+            }
+            else
+            {
+                sb.Append(c);
+            }
         }
-        fields.Add(sb.ToString());
-        return fields;
+
+        if (inQuotes) throw new FormatException("Delimited text contains an unterminated quoted field.");
+        if (sb.Length > 0 || fields.Count > 0 || (text.Length > 0 && text[^1] != '\r' && text[^1] != '\n'))
+            EndRecord();
+        while (rows.Count > 0 && rows[^1].Count == 1 && rows[^1][0].Length == 0)
+            rows.RemoveAt(rows.Count - 1);
+        return rows;
     }
 
     private static string Escape(string value, char delim)

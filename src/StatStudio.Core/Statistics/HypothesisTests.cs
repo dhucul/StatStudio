@@ -41,6 +41,9 @@ public static class HypothesisTests
     public static OneSampleTResult OneSampleT(double[] x, double mu0 = 0,
         double conf = 0.95, Alternative alt = Alternative.TwoSided)
     {
+        RequireSample(x, 2, nameof(x));
+        RequireFinite(mu0, nameof(mu0));
+        StatGuard.Probability(conf, nameof(conf));
         int n = x.Length;
         double mean = Mean(x), sd = StdDev(x), se = sd / Math.Sqrt(n);
         double df = n - 1;
@@ -53,6 +56,9 @@ public static class HypothesisTests
     public static TwoSampleTResult TwoSampleT(double[] x1, double[] x2, bool pooled = false,
         double conf = 0.95, Alternative alt = Alternative.TwoSided)
     {
+        RequireSample(x1, 2, nameof(x1));
+        RequireSample(x2, 2, nameof(x2));
+        StatGuard.Probability(conf, nameof(conf));
         int n1 = x1.Length, n2 = x2.Length;
         double m1 = Mean(x1), m2 = Mean(x2), s1 = StdDev(x1), s2 = StdDev(x2);
         double v1 = s1 * s1, v2 = s2 * s2;
@@ -82,8 +88,13 @@ public static class HypothesisTests
     public static PairedTResult PairedT(double[] x1, double[] x2,
         double conf = 0.95, Alternative alt = Alternative.TwoSided)
     {
+        ArgumentNullException.ThrowIfNull(x1);
+        ArgumentNullException.ThrowIfNull(x2);
         if (x1.Length != x2.Length)
             throw new ArgumentException("Paired t requires equal-length, row-matched samples.");
+        RequireSample(x1, 2, nameof(x1));
+        RequireSample(x2, 2, nameof(x2));
+        StatGuard.Probability(conf, nameof(conf));
         int n = x1.Length;
         var d = new double[n];
         for (int i = 0; i < n; i++) d[i] = x1[i] - x2[i];
@@ -102,6 +113,9 @@ public static class HypothesisTests
     public static OnePropResult OneProportion(int x, int n, double p0 = 0.5,
         double conf = 0.95, Alternative alt = Alternative.TwoSided)
     {
+        RequireCount(x, n, nameof(x));
+        StatGuard.Probability(p0, nameof(p0));
+        StatGuard.Probability(conf, nameof(conf));
         double phat = (double)x / n;
         double seTest = Math.Sqrt(p0 * (1 - p0) / n);
         double z = seTest > 0 ? (phat - p0) / seTest : double.NaN;
@@ -116,6 +130,9 @@ public static class HypothesisTests
     public static TwoPropResult TwoProportions(int x1, int n1, int x2, int n2,
         double conf = 0.95, Alternative alt = Alternative.TwoSided)
     {
+        RequireCount(x1, n1, nameof(x1));
+        RequireCount(x2, n2, nameof(x2));
+        StatGuard.Probability(conf, nameof(conf));
         double p1 = (double)x1 / n1, p2 = (double)x2 / n2, diff = p1 - p2;
         double pPool = (double)(x1 + x2) / (n1 + n2);
         double seTest = Math.Sqrt(pPool * (1 - pPool) * (1.0 / n1 + 1.0 / n2));
@@ -131,9 +148,17 @@ public static class HypothesisTests
 
     public static ChiSquareGofResult ChiSquareGof(double[] observed, double[]? expected = null)
     {
+        ArgumentNullException.ThrowIfNull(observed);
+        if (observed.Length < 2 || observed.Any(v => !double.IsFinite(v) || v < 0) || observed.Sum() <= 0)
+            throw new ArgumentException("Observed counts must contain at least two non-negative finite categories with a positive total.",
+                nameof(observed));
         int k = observed.Length;
         double total = observed.Sum();
         var exp = expected ?? Enumerable.Repeat(total / k, k).ToArray();
+        if (exp.Length != k || exp.Any(v => !double.IsFinite(v) || v <= 0))
+            throw new ArgumentException("Expected counts must be positive, finite, and match observed counts.", nameof(expected));
+        if (expected is not null && Math.Abs(exp.Sum() - total) > 1e-8 * Math.Max(1, total))
+            throw new ArgumentException("Expected counts must sum to the observed total.", nameof(expected));
         double chi = 0;
         for (int i = 0; i < k; i++) chi += (observed[i] - exp[i]) * (observed[i] - exp[i]) / exp[i];
         int df = k - 1;
@@ -143,12 +168,23 @@ public static class HypothesisTests
 
     public static ContingencyResult ChiSquareAssociation(double[,] table)
     {
+        ArgumentNullException.ThrowIfNull(table);
         int rows = table.GetLength(0), cols = table.GetLength(1);
+        if (rows < 2 || cols < 2)
+            throw new ArgumentException("Association table must be at least 2x2.", nameof(table));
         var rowT = new double[rows];
         var colT = new double[cols];
         double total = 0;
         for (int i = 0; i < rows; i++)
-            for (int j = 0; j < cols; j++) { rowT[i] += table[i, j]; colT[j] += table[i, j]; total += table[i, j]; }
+            for (int j = 0; j < cols; j++)
+            {
+                double value = table[i, j];
+                if (!double.IsFinite(value) || value < 0)
+                    throw new ArgumentException("Association counts must be non-negative and finite.", nameof(table));
+                rowT[i] += value; colT[j] += value; total += value;
+            }
+        if (total <= 0 || rowT.Any(v => v <= 0) || colT.Any(v => v <= 0))
+            throw new ArgumentException("Every association row and column must have a positive total.", nameof(table));
 
         var exp = new double[rows, cols];
         double chi = 0;
@@ -176,6 +212,25 @@ public static class HypothesisTests
             Alternative.Greater => 1 - d.CumulativeDistribution(t),
             _ => 2 * (1 - d.CumulativeDistribution(Math.Abs(t))),
         };
+    }
+
+    private static void RequireSample(double[] values, int minimum, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        if (values.Length < minimum)
+            throw new ArgumentException($"Sample needs at least {minimum} observations.", paramName);
+        StatGuard.Finite(values, paramName);
+    }
+
+    private static void RequireCount(int events, int trials, string paramName)
+    {
+        if (trials <= 0 || events < 0 || events > trials)
+            throw new ArgumentOutOfRangeException(paramName, "Events must be between 0 and a positive trial count.");
+    }
+
+    private static void RequireFinite(double value, string paramName)
+    {
+        if (!double.IsFinite(value)) throw new ArgumentOutOfRangeException(paramName);
     }
 
     private static double PFromZ(double z, Alternative alt)

@@ -3,7 +3,7 @@
 ; Produces dist\StatStudioSetup.exe from the self-contained publish in dist\publish.
 
 #define MyAppName "StatStudio"
-#define MyAppVersion "2.1"
+#define MyAppVersion "2.1.1"
 #define MyAppPublisher "StatStudio"
 #define MyAppExeName "StatStudio.exe"
 
@@ -12,14 +12,14 @@ AppId={{F2A7C3D1-9B4E-4A6F-8C2D-1E5B7A9F3C04}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\StatStudio
+DefaultDirName={commonpf}\StatStudio
 DefaultGroupName=StatStudio
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupIconFile=..\src\StatStudio.Wpf\app.ico
-; The app does not need elevation, so install per-user (no UAC prompt).
-PrivilegesRequired=lowest
+; Install system-wide under Program Files, which requires elevation.
+PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Reliable in-place upgrade: detect & close a running instance and don't auto-restart.
@@ -31,7 +31,7 @@ OutputBaseFilename=StatStudioSetup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-VersionInfoVersion=2.1.0.0
+VersionInfoVersion=2.1.1.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Setup
 

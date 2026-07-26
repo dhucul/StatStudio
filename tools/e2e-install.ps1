@@ -1,77 +1,142 @@
-# End-to-end installer check (per-user install, no elevation needed).
-# Does: silent install -> launch + screenshot -> kill -> silent uninstall, and
-# writes results + a screenshot to dist\ for the caller to read back.
-$ErrorActionPreference = 'Continue'
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$InstallDir
+)
+
+# End-to-end installer check in a caller-provided, isolated directory.
+# Performs silent install -> launch + screenshot -> stop -> silent uninstall.
+$ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $setup = Join-Path $root 'dist\StatStudioSetup.exe'
 $result = Join-Path $root 'dist\e2e-result.txt'
 $shot = Join-Path $root 'dist\e2e-shot.png'
-$installDir = Join-Path $env:LOCALAPPDATA 'Programs\StatStudio'
+$installDir = [System.IO.Path]::GetFullPath($InstallDir)
+$installRoot = [System.IO.Path]::GetPathRoot($installDir)
+if ($installDir -eq $installRoot) { throw "InstallDir cannot be a filesystem root." }
+if (Test-Path -LiteralPath $installDir) {
+    throw "InstallDir must be an unused path so cleanup cannot affect an existing installation: $installDir"
+}
 $exe = Join-Path $installDir 'StatStudio.exe'
 
 $log = New-Object System.Collections.Generic.List[string]
-function L($m) { $log.Add($m); }
+function L($message) { $log.Add($message) }
+function FileCount {
+    if (-not (Test-Path -LiteralPath $installDir)) { return 0 }
+    return @(Get-ChildItem -LiteralPath $installDir -Recurse -File -ErrorAction SilentlyContinue).Count
+}
+
 L "install target: $installDir"
 
 Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
-using System; using System.Drawing; using System.Runtime.InteropServices;
+using System;
+using System.Drawing;
+using System.Runtime.InteropServices;
 public class Cap {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L,T,R,B; }
-    public static Bitmap Grab(IntPtr h){ RECT r; GetWindowRect(h, out r); int w=r.R-r.L, ht=r.B-r.T;
-        var b=new Bitmap(w,ht); using(var g=Graphics.FromImage(b)) g.CopyFromScreen(r.L,r.T,0,0,new Size(w,ht)); return b; }
+    public static Bitmap Grab(IntPtr h) {
+        RECT r;
+        if (h == IntPtr.Zero || !GetWindowRect(h, out r)) throw new InvalidOperationException("Unable to read window bounds.");
+        int w = r.R-r.L, ht = r.B-r.T;
+        if (w <= 0 || ht <= 0) throw new InvalidOperationException("The application window has invalid bounds.");
+        var b = new Bitmap(w,ht);
+        using(var g=Graphics.FromImage(b)) {
+            IntPtr hdc = g.GetHdc();
+            try {
+                if (!PrintWindow(h, hdc, 2)) throw new InvalidOperationException("The application window could not be rendered.");
+            }
+            finally { g.ReleaseHdc(hdc); }
+        }
+        return b;
+    }
 }
 "@
 
+$failed = $false
+$installed = $false
+$ap = $null
+$bmp = $null
 try {
-    # 1. INSTALL (silent)
+    if (-not (Test-Path -LiteralPath $setup)) { throw "Installer not found: $setup" }
+
     L "== install =="
     $ilog = Join-Path $root 'dist\e2e-install.log'
-    $p = Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$ilog" -Wait -PassThru
+    $p = Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',
+        "/DIR=`"$installDir`"", "/LOG=`"$ilog`"" -Wait -PassThru
     L "  setup exit code: $($p.ExitCode)"
-    L "  installed exe exists: $(Test-Path $exe)"
+    if ($p.ExitCode -ne 0) { throw "Setup returned exit code $($p.ExitCode)." }
+    if (-not (Test-Path -LiteralPath $exe)) { throw "Installation completed without creating $exe." }
+    $installed = $true
+    L "  installed exe exists: True"
 
-    if (Test-Path $exe) {
-        # 2. LAUNCH + screenshot
-        L "== launch =="
-        $ap = Start-Process $exe -PassThru
-        for ($i=0; $i -lt 60 -and $ap.MainWindowHandle -eq 0; $i++){ Start-Sleep -Milliseconds 200; $ap.Refresh() }
-        Start-Sleep -Seconds 2
-        L "  app running: $(-not $ap.HasExited); window handle != 0: $($ap.MainWindowHandle -ne 0)"
-        L "  window title: $($ap.MainWindowTitle)"
-        if ($ap.MainWindowHandle -ne 0) {
-            [Cap]::SetForegroundWindow($ap.MainWindowHandle) | Out-Null
-            Start-Sleep -Milliseconds 500
-            $bmp = [Cap]::Grab($ap.MainWindowHandle); $bmp.Save($shot, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
-            L "  screenshot: $shot"
-        }
+    L "== launch =="
+    $ap = Start-Process $exe -PassThru
+    for ($i = 0; $i -lt 60 -and $ap.MainWindowHandle -eq 0; $i++) {
+        if ($ap.HasExited) { throw "The installed application exited before creating a window." }
+        Start-Sleep -Milliseconds 200
+        $ap.Refresh()
+    }
+    if ($ap.HasExited -or $ap.MainWindowHandle -eq 0) { throw "The installed application did not create a window." }
+    L "  app running: True; window handle != 0: True"
+    L "  window title: $($ap.MainWindowTitle)"
+
+    [Cap]::SetForegroundWindow($ap.MainWindowHandle) | Out-Null
+    Start-Sleep -Milliseconds 500
+    $bmp = [Cap]::Grab($ap.MainWindowHandle)
+    $bmp.Save($shot, [System.Drawing.Imaging.ImageFormat]::Png)
+    if (-not (Test-Path -LiteralPath $shot) -or (Get-Item -LiteralPath $shot).Length -eq 0) {
+        throw "Screenshot creation failed."
+    }
+    L "  screenshot: $shot"
+}
+catch {
+    $failed = $true
+    L "EXCEPTION: $($_.Exception.Message)"
+}
+finally {
+    if ($null -ne $bmp) { $bmp.Dispose() }
+    if ($null -ne $ap -and -not $ap.HasExited) {
         Stop-Process -Id $ap.Id -Force -ErrorAction SilentlyContinue
         L "  app stopped"
     }
 
-    # 3. UNINSTALL (silent) -- poll on FILES being gone (Inno's uninstaller relaunches
-    #    from temp and can leave an empty dir briefly), then drop any empty leftover.
-    L "== uninstall =="
-    $unins = Join-Path $installDir 'unins000.exe'
-    L "  uninstaller exists: $(Test-Path $unins)"
-    function FileCount { @(Get-ChildItem $installDir -Recurse -File -ErrorAction SilentlyContinue).Count }
-    if (Test-Path $unins) {
-        Start-Process $unins -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait | Out-Null
-        for ($i=0; $i -lt 60; $i++) {
-            if (-not (Test-Path $installDir) -or (FileCount) -eq 0) { break }
-            Start-Sleep -Milliseconds 500
+    try {
+        L "== uninstall =="
+        $unins = Join-Path $installDir 'unins000.exe'
+        if ($installed -and -not (Test-Path -LiteralPath $unins)) {
+            throw "Installed application has no uninstaller."
         }
-        if ((Test-Path $installDir) -and (FileCount) -eq 0) {
-            Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $unins) {
+            $up = Start-Process $unins -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+            if ($up.ExitCode -ne 0) { throw "Uninstaller returned exit code $($up.ExitCode)." }
+            for ($i = 0; $i -lt 60 -and (FileCount) -gt 0; $i++) {
+                Start-Sleep -Milliseconds 500
+            }
+        }
+
+        $remaining = FileCount
+        L "  files removed: $($remaining -eq 0)"
+        if ($remaining -ne 0) { throw "Uninstall left $remaining file(s) behind." }
+        if (Test-Path -LiteralPath $installDir) {
+            Remove-Item -LiteralPath $installDir -Recurse -Force
+        }
+        L "  install dir removed: $(-not (Test-Path -LiteralPath $installDir))"
+    }
+    catch {
+        $failed = $true
+        L "CLEANUP EXCEPTION: $($_.Exception.Message)"
+        # InstallDir was required to be absent at entry, so this fallback only removes
+        # artifacts produced by this run.
+        if (Test-Path -LiteralPath $installDir) {
+            Remove-Item -LiteralPath $installDir -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
-    $remaining = if (Test-Path $installDir) { FileCount } else { 0 }
-    L "  files removed: $($remaining -eq 0)"
-    L "  install dir removed: $(-not (Test-Path $installDir))"
-}
-catch { L "EXCEPTION: $($_.Exception.Message)" }
 
-$log | Set-Content $result -Encoding UTF8
-Get-Content $result
+    $log | Set-Content -LiteralPath $result -Encoding UTF8
+}
+
+Get-Content -LiteralPath $result
+if ($failed) { exit 1 }

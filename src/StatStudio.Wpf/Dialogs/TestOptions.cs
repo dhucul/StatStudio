@@ -15,16 +15,21 @@ internal static class TestOptions
         _ => Alternative.TwoSided,
     };
 
-    /// <summary>Accepts "95" or "0.95"; returns a 0..1 confidence (default 0.95).</summary>
-    public static double ParseConf(string? text)
+    /// <summary>Accepts "95" or "0.95" and requires a confidence strictly between zero and one.</summary>
+    public static bool TryParseConf(string? text, out double confidence)
     {
         if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
-            return v > 1 ? v / 100.0 : v;
-        return 0.95;
+        {
+            confidence = v > 1 ? v / 100.0 : v;
+            return double.IsFinite(confidence) && confidence > 0 && confidence < 1;
+        }
+        confidence = default;
+        return false;
     }
 
     public static bool ParseDouble(string? text, out double value) =>
-        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value) &&
+        double.IsFinite(value);
 
     public static bool ParseInt(string? text, out int value) =>
         int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);

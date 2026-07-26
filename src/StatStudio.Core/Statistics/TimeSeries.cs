@@ -23,6 +23,8 @@ public static class TimeSeries
 
     public static AcfResult Autocorrelation(double[] y, int maxLag)
     {
+        RequireSeries(y, 1);
+        if (maxLag < 0) throw new ArgumentOutOfRangeException(nameof(maxLag));
         int n = y.Length;
         maxLag = Math.Min(maxLag, n - 1);
         double mean = y.Average();
@@ -59,6 +61,8 @@ public static class TimeSeries
 
     public static TrendResult LinearTrend(double[] y, int forecasts = 0)
     {
+        RequireSeries(y, 3);
+        RequireForecasts(forecasts);
         int n = y.Length;
         var t = Enumerable.Range(1, n).Select(i => (double)i).ToArray();
         var reg = Regression.SimpleLinear(t, y, "t", "Y");
@@ -70,6 +74,8 @@ public static class TimeSeries
 
     public static TrendResult QuadraticTrend(double[] y, int forecasts = 0)
     {
+        RequireSeries(y, 4);
+        RequireForecasts(forecasts);
         int n = y.Length;
         var t = Enumerable.Range(1, n).Select(i => (double)i).ToArray();
         var reg = RegressionExtensions.Polynomial(t, y, 2, "t", "Y");
@@ -83,6 +89,10 @@ public static class TimeSeries
 
     public static SmoothingResult MovingAverage(double[] y, int length, int forecasts = 0)
     {
+        RequireSeries(y, 1);
+        if (length < 1 || length > y.Length)
+            throw new ArgumentOutOfRangeException(nameof(length), "Length must be between 1 and the series length.");
+        RequireForecasts(forecasts);
         int n = y.Length;
         var fitted = new double[n];
         Array.Fill(fitted, double.NaN);
@@ -107,6 +117,9 @@ public static class TimeSeries
 
     public static SmoothingResult SingleExp(double[] y, double alpha, int forecasts = 0)
     {
+        RequireSeries(y, 1);
+        StatGuard.UnitInterval(alpha, nameof(alpha));
+        RequireForecasts(forecasts);
         int n = y.Length;
         var fitted = new double[n];
         Array.Fill(fitted, double.NaN);
@@ -123,6 +136,10 @@ public static class TimeSeries
 
     public static SmoothingResult DoubleExp(double[] y, double alpha, double beta, int forecasts = 0)
     {
+        RequireSeries(y, 2);
+        StatGuard.UnitInterval(alpha, nameof(alpha));
+        StatGuard.UnitInterval(beta, nameof(beta));
+        RequireForecasts(forecasts);
         int n = y.Length;
         var fitted = new double[n];
         Array.Fill(fitted, double.NaN);
@@ -143,6 +160,14 @@ public static class TimeSeries
     public static SmoothingResult Winters(double[] y, int period, double alpha, double beta, double gamma,
         bool multiplicative, int forecasts = 0)
     {
+        RequireSeries(y, 1);
+        if (period < 2) throw new ArgumentOutOfRangeException(nameof(period));
+        StatGuard.UnitInterval(alpha, nameof(alpha));
+        StatGuard.UnitInterval(beta, nameof(beta));
+        StatGuard.UnitInterval(gamma, nameof(gamma));
+        RequireForecasts(forecasts);
+        if (multiplicative && y.Any(v => v <= 0))
+            throw new ArgumentException("Multiplicative Winters requires positive observations.", nameof(y));
         int n = y.Length;
         if (n < 2 * period) throw new ArgumentException("Winters needs at least two full seasons of data.");
 
@@ -188,6 +213,12 @@ public static class TimeSeries
 
     public static DecompositionResult Decompose(double[] y, int period, bool multiplicative)
     {
+        RequireSeries(y, 1);
+        if (period < 2) throw new ArgumentOutOfRangeException(nameof(period));
+        if (y.Length < 2 * period)
+            throw new ArgumentException("Decomposition needs at least two full seasons.", nameof(y));
+        if (multiplicative && y.Any(v => v <= 0))
+            throw new ArgumentException("Multiplicative decomposition requires positive observations.", nameof(y));
         int n = y.Length;
         var trend = new double[n];
         Array.Fill(trend, double.NaN);
@@ -236,18 +267,32 @@ public static class TimeSeries
     private static AccuracyMeasures Accuracy(double[] actual, double[] fitted)
     {
         double mape = 0, mad = 0, msd = 0;
-        int count = 0;
+        int count = 0, mapeCount = 0;
         for (int i = 0; i < actual.Length; i++)
         {
             if (double.IsNaN(fitted[i])) continue;
             double e = actual[i] - fitted[i];
             mad += Math.Abs(e);
             msd += e * e;
-            if (actual[i] != 0) mape += Math.Abs(e / actual[i]);
+            if (actual[i] != 0) { mape += Math.Abs(e / actual[i]); mapeCount++; }
             count++;
         }
         if (count == 0) return new AccuracyMeasures(double.NaN, double.NaN, double.NaN);
-        return new AccuracyMeasures(100 * mape / count, mad / count, msd / count);
+        return new AccuracyMeasures(mapeCount == 0 ? double.NaN : 100 * mape / mapeCount,
+            mad / count, msd / count);
+    }
+
+    private static void RequireSeries(double[] y, int minimumLength)
+    {
+        ArgumentNullException.ThrowIfNull(y);
+        if (y.Length < minimumLength)
+            throw new ArgumentException($"Series needs at least {minimumLength} observation(s).", nameof(y));
+        StatGuard.Finite(y, nameof(y));
+    }
+
+    private static void RequireForecasts(int forecasts)
+    {
+        if (forecasts < 0) throw new ArgumentOutOfRangeException(nameof(forecasts));
     }
 
     private static string Round(double v) => v.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);

@@ -10,7 +10,12 @@ public static class FishersExact
     /// <summary>Fisher's exact test for a 2×2 table [[a,b],[c,d]] (hypergeometric).</summary>
     public static FisherResult Test(int a, int b, int c, int d)
     {
+        if (a < 0 || b < 0 || c < 0 || d < 0)
+            throw new ArgumentOutOfRangeException(nameof(a), "Cell counts must be nonnegative.");
+
         int r1 = a + b, r2 = c + d, c1 = a + c, n = a + b + c + d;
+        if (n == 0)
+            throw new ArgumentException("The contingency table must contain at least one observation.");
         int lo = Math.Max(0, c1 - r2), hi = Math.Min(r1, c1);
 
         double pObs = HyperProb(a, r1, r2, c1, n);

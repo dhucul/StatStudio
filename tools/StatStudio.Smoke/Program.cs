@@ -4,6 +4,7 @@ internal static class Program
 {
     private static int Main()
     {
+        Check.Reset();
         Console.WriteLine("StatStudio smoke tests");
         DataTests.Run();
         StatTests.Run();
@@ -17,6 +18,7 @@ internal static class Program
         DoeTests.Run();
         FaRelTests.Run();
         BayesMixedTests.Run();
+        EdgeTests.Run();
         return Check.Summary();
     }
 }

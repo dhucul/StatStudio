@@ -59,11 +59,31 @@ public partial class TimeSeriesWindow : Window
             if (!TestOptions.ParseInt(PeriodBox.Text, out var p) || p < 2) { Warn("Period must be ≥ 2."); return; }
             Period = p;
         }
-        if (AlphaRow.Visibility == Visibility.Visible && TestOptions.ParseDouble(AlphaBox.Text, out var a)) Alpha = a;
-        if (BetaRow.Visibility == Visibility.Visible && TestOptions.ParseDouble(BetaBox.Text, out var b)) Beta = b;
-        if (GammaRow.Visibility == Visibility.Visible && TestOptions.ParseDouble(GammaBox.Text, out var g)) Gamma = g;
-        if (MaxLagRow.Visibility == Visibility.Visible && TestOptions.ParseInt(MaxLagBox.Text, out var ml)) MaxLag = ml;
-        if (ForecastRow.Visibility == Visibility.Visible && TestOptions.ParseInt(ForecastBox.Text, out var f)) Forecasts = f;
+        if (AlphaRow.Visibility == Visibility.Visible)
+        {
+            if (!TestOptions.ParseDouble(AlphaBox.Text, out var a) || a < 0 || a > 1) { Warn("Alpha must be between 0 and 1."); return; }
+            Alpha = a;
+        }
+        if (BetaRow.Visibility == Visibility.Visible)
+        {
+            if (!TestOptions.ParseDouble(BetaBox.Text, out var b) || b < 0 || b > 1) { Warn("Beta must be between 0 and 1."); return; }
+            Beta = b;
+        }
+        if (GammaRow.Visibility == Visibility.Visible)
+        {
+            if (!TestOptions.ParseDouble(GammaBox.Text, out var g) || g < 0 || g > 1) { Warn("Gamma must be between 0 and 1."); return; }
+            Gamma = g;
+        }
+        if (MaxLagRow.Visibility == Visibility.Visible)
+        {
+            if (!TestOptions.ParseInt(MaxLagBox.Text, out var ml) || ml < 0) { Warn("Maximum lag must be nonnegative."); return; }
+            MaxLag = ml;
+        }
+        if (ForecastRow.Visibility == Visibility.Visible)
+        {
+            if (!TestOptions.ParseInt(ForecastBox.Text, out var f) || f < 0) { Warn("Forecast count must be nonnegative."); return; }
+            Forecasts = f;
+        }
         DialogResult = true;
     }
 

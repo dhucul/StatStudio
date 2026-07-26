@@ -37,9 +37,37 @@ internal static class DataTests
         Check.Equal(tsv.ColumnCount, 2, "tab delimiter detected");
         Check.Equal(tsv.Columns[0].Name, "x", "tab header name");
 
+        var tsvPath = Path.Combine(Path.GetTempPath(), $"statstudio_smoke_{Guid.NewGuid():N}.tsv");
+        try
+        {
+            WorksheetIo.WriteCsv(ws, tsvPath, '\t');
+            Check.True(File.ReadLines(tsvPath).First().Contains('\t'), "TSV path export uses tabs");
+            Check.Equal(WorksheetIo.ReadCsv(tsvPath).ColumnCount, 2, "TSV path export round-trip");
+        }
+        finally { if (File.Exists(tsvPath)) File.Delete(tsvPath); }
+
         var quoted = WorksheetIo.ReadCsv(new StringReader("name,note\n\"Doe, J\",\"a \"\"b\"\" c\""));
         Check.Equal(quoted.Columns[0][0]!, "Doe, J", "quoted field with comma");
         Check.Equal(quoted.Columns[1][0]!, "a \"b\" c", "escaped quotes");
+
+        var multilineSource = new Worksheet { Name = "Multiline" };
+        multilineSource.AddColumn("Text", ColumnType.Text).Add("first line\nsecond line");
+        multilineSource.AddColumn("Value").Add("42");
+        var multilineText = new StringWriter();
+        WorksheetIo.WriteCsv(multilineSource, multilineText);
+        var multiline = WorksheetIo.ReadCsv(new StringReader(multilineText.ToString()));
+        Check.Equal(multiline.RowCount, 1, "quoted newline remains one record");
+        Check.Equal(multiline.Columns[0][0]!, "first line\nsecond line", "quoted newline round-trip");
+
+        var quotedDelimiter = WorksheetIo.ReadCsv(new StringReader("\"label,detail\";value\nalpha;1"));
+        Check.Equal(quotedDelimiter.ColumnCount, 2, "delimiter detection ignores quoted separators");
+        Check.Equal(quotedDelimiter.Columns[0].Name, "label,detail", "quoted delimiter header");
+
+        var finite = new Worksheet().AddColumn("Finite boundary");
+        foreach (var value in new[] { "1", "NaN", "Infinity" }) finite.Add(value);
+        Check.Equal(finite.NumericValues().Length, 1, "non-finite worksheet values are excluded");
+        Check.True(!finite.LooksNumeric(), "non-finite cells do not make a numeric column");
+        Check.Throws<ArgumentOutOfRangeException>(() => finite.Set(-1, "2"), "negative row index rejected");
 
         Check.Section("Excel (.xlsx) round-trip");
         var xw = new Worksheet { Name = "X" };
@@ -48,14 +76,18 @@ internal static class DataTests
         var v2 = xw.AddColumn("Tag", ColumnType.Text);
         foreach (var v in new[] { "p", "q", "r" }) v2.Add(v);
 
-        var xlsx = Path.Combine(Path.GetTempPath(), "statstudio_smoke.xlsx");
-        WorksheetIo.WriteXlsx(xw, xlsx);
-        var xback = WorksheetIo.ReadXlsx(xlsx);
-        Check.Equal(xback.ColumnCount, 2, "xlsx columns");
-        Check.Equal(xback.Columns[0].Name, "Val", "xlsx header");
-        Check.Close(xback.Columns[0].NumericValues()[1], 2.5, "xlsx numeric value");
-        Check.Equal(xback.Columns[1][0]!, "p", "xlsx text value");
-        File.Delete(xlsx);
+        var xlsx = Path.Combine(Path.GetTempPath(), $"statstudio_smoke_{Guid.NewGuid():N}.xlsx");
+        try
+        {
+            File.WriteAllText(xlsx, "old");
+            WorksheetIo.WriteXlsx(xw, xlsx);
+            var xback = WorksheetIo.ReadXlsx(xlsx);
+            Check.Equal(xback.ColumnCount, 2, "xlsx columns");
+            Check.Equal(xback.Columns[0].Name, "Val", "xlsx header");
+            Check.Close(xback.Columns[0].NumericValues()[1], 2.5, "xlsx numeric value");
+            Check.Equal(xback.Columns[1][0]!, "p", "xlsx text value");
+        }
+        finally { if (File.Exists(xlsx)) File.Delete(xlsx); }
 
         Check.Section("Worksheet calculator");
         var cw2 = new Worksheet();
@@ -77,6 +109,7 @@ internal static class DataTests
         Check.Close(Calculator.Evaluate("2^-2", cw2)[0], 0.25, "negative exponent");
         Check.Close(Calculator.Evaluate("2 * -3", cw2)[0], -6, "unary minus after operator");
         Check.Close(Calculator.Evaluate("2^3^2", cw2)[0], 512, "power is right-associative");
+        Check.Throws<FormatException>(() => Calculator.Evaluate("''", cw2), "empty quoted calculator identifier rejected");
 
         Check.Section("Sample datasets build");
         foreach (var ds in SampleData.All)
@@ -92,12 +125,19 @@ internal static class DataTests
         Check.Close(rowSum, 1.0, "concrete mixture row sums to 1", 1e-3);
 
         Check.Section("Project (.ssproj) round-trip");
-        var proj = Path.Combine(Path.GetTempPath(), "statstudio_smoke.ssproj");
-        ProjectStore.Save(xw, proj);
-        var pback = ProjectStore.Load(proj);
-        Check.Equal(pback.ColumnCount, 2, "ssproj columns");
-        Check.Equal(pback.Name, "X", "ssproj name");
-        Check.Equal(pback.Columns[1][0]!, "p", "ssproj cell");
-        File.Delete(proj);
+        var proj = Path.Combine(Path.GetTempPath(), $"statstudio_smoke_{Guid.NewGuid():N}.ssproj");
+        try
+        {
+            File.WriteAllText(proj, "old");
+            ProjectStore.Save(xw, proj);
+            var pback = ProjectStore.Load(proj);
+            Check.Equal(pback.ColumnCount, 2, "ssproj columns");
+            Check.Equal(pback.Name, "X", "ssproj name");
+            Check.Equal(pback.Columns[1][0]!, "p", "ssproj cell");
+
+            File.WriteAllText(proj, """{"Name":"Bad","Columns":null}""");
+            Check.Throws<InvalidDataException>(() => ProjectStore.Load(proj), "null project columns rejected");
+        }
+        finally { if (File.Exists(proj)) File.Delete(proj); }
     }
 }

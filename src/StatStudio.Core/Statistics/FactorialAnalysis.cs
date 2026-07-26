@@ -17,18 +17,39 @@ public static class FactorialAnalysis
     public static FactorialResult Analyze(double[] y, double[][] factors, IReadOnlyList<string> factorNames,
         string response = "Y")
     {
+        StatGuard.Design(y, factors, factorNames);
         int n = y.Length;
         int k = factors.Length;
         if (k < 1 || k > 7) throw new ArgumentException("Factorial analysis supports 1..7 factors.");
+        if (n < 2) throw new ArgumentException("Factorial analysis needs at least 2 runs.");
 
         // Code each factor to ±1 (center -> 0).
         var coded = new double[k][];
         for (int j = 0; j < k; j++)
         {
             double min = factors[j].Min(), max = factors[j].Max();
+            if (min == max) throw new ArgumentException($"Factor '{factorNames[j]}' has only one level.");
             double mid = (min + max) / 2, half = (max - min) / 2;
             coded[j] = factors[j].Select(v => half > 0 ? (v - mid) / half : 0).ToArray();
+            if (coded[j].Any(v => !Near(v, -1) && !Near(v, 0) && !Near(v, 1)))
+                throw new ArgumentException($"Factor '{factorNames[j]}' is not two-level with optional center points.");
         }
+
+        var cornerGroups = new Dictionary<string, int>();
+        for (int i = 0; i < n; i++)
+        {
+            bool corner = coded.All(c => Near(Math.Abs(c[i]), 1));
+            bool center = coded.All(c => Near(c[i], 0));
+            if (!corner && !center)
+                throw new ArgumentException("Runs must be factorial corners or all-factor center points.");
+            if (corner)
+            {
+                string key = string.Join(",", coded.Select(c => c[i] > 0 ? "1" : "-1"));
+                cornerGroups[key] = cornerGroups.GetValueOrDefault(key) + 1;
+            }
+        }
+        if (cornerGroups.Count != (1 << k) || cornerGroups.Values.Distinct().Count() != 1)
+            throw new ArgumentException("Factorial corner combinations must be complete and balanced.");
 
         double yBar = y.Average();
         double ssTotal = y.Sum(v => (v - yBar) * (v - yBar));
@@ -70,4 +91,6 @@ public static class FactorialAnalysis
         double r2 = ssTotal > 0 ? ssModel / ssTotal : double.NaN;
         return new FactorialResult(response, factorNames, ordered, double.IsNaN(msErr) ? double.NaN : Math.Sqrt(msErr), r2, n, dfPe);
     }
+
+    private static bool Near(double value, double expected) => Math.Abs(value - expected) <= 1e-8;
 }

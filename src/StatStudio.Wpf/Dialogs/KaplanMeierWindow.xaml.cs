@@ -22,6 +22,12 @@ public partial class KaplanMeierWindow : Window
     private void OnOk(object sender, RoutedEventArgs e)
     {
         if (TimesCombo.SelectedItem is null) { MessageBox.Show("Pick a time column.", Title); return; }
+        if (CensorColumn == TimesColumn)
+        {
+            MessageBox.Show("Choose a different censoring-indicator column.", Title,
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         DialogResult = true;
     }
 }

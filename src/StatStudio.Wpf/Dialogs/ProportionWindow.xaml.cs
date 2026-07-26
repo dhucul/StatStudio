@@ -66,7 +66,13 @@ public partial class ProportionWindow : Window
         }
 
         Alt = TestOptions.ParseAlt(AltCombo.SelectedIndex);
-        Confidence = TestOptions.ParseConf(ConfBox.Text);
+        if (!TestOptions.TryParseConf(ConfBox.Text, out var confidence))
+        {
+            MessageBox.Show("Confidence must be between 0 and 1 (or between 0 and 100 as a percent).", Title,
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        Confidence = confidence;
         DialogResult = true;
     }
 }

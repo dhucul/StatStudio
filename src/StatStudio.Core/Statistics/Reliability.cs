@@ -19,6 +19,7 @@ public static class Reliability
 
     public static DistributionFit FitExponential(double[] t)
     {
+        RequireLifeData(t, positive: true);
         double mean = t.Average();                       // scale = MTTF
         var pct = Pcts.Select(p => (p, -mean * Math.Log(1 - p / 100))).ToList();
         return new DistributionFit("Exponential",
@@ -28,6 +29,7 @@ public static class Reliability
 
     public static DistributionFit FitWeibull(double[] t)
     {
+        RequireLifeData(t, positive: true);
         int n = t.Length;
         double meanLn = t.Average(x => Math.Log(x));
         double Shape(double b)
@@ -51,6 +53,7 @@ public static class Reliability
 
     public static DistributionFit FitLognormal(double[] t)
     {
+        RequireLifeData(t, positive: true);
         var logs = t.Select(x => Math.Log(x)).ToArray();
         double mu = logs.Average();
         double sigma = Math.Sqrt(logs.Average(v => (v - mu) * (v - mu)));
@@ -64,6 +67,7 @@ public static class Reliability
 
     public static DistributionFit FitNormal(double[] t)
     {
+        RequireLifeData(t, positive: true);
         double mu = t.Average();
         double sigma = Math.Sqrt(t.Average(v => (v - mu) * (v - mu)));
         var pct = Pcts.Select(p => (p, mu + sigma * Normal.InvCDF(0, 1, p / 100))).ToList();
@@ -75,25 +79,54 @@ public static class Reliability
     /// <summary>Kaplan-Meier survival estimate. <paramref name="censored"/>[i] = true means right-censored.</summary>
     public static KaplanMeierResult KaplanMeier(double[] times, bool[] censored)
     {
+        ArgumentNullException.ThrowIfNull(times);
+        ArgumentNullException.ThrowIfNull(censored);
+        if (times.Length == 0)
+            throw new ArgumentException("At least one survival time is required.", nameof(times));
+        if (times.Length != censored.Length)
+            throw new ArgumentException("Survival times and censoring indicators must have equal lengths.");
+        StatGuard.Finite(times, nameof(times));
+        if (times.Any(t => t < 0))
+            throw new ArgumentOutOfRangeException(nameof(times), "Survival times must be nonnegative.");
+
         int n = times.Length;
-        var order = Enumerable.Range(0, n).OrderBy(i => times[i]).ToArray();
-        var distinct = times.Distinct().OrderBy(v => v).ToArray();
+        var observations = times.Zip(censored)
+            .OrderBy(pair => pair.First)
+            .ToArray();
 
         var rows = new List<KmRow>();
         double s = 1.0;
         double median = double.NaN;
         int events = 0;
-        foreach (var t in distinct)
+        int atRisk = n;
+        int index = 0;
+        while (index < observations.Length)
         {
-            int atRisk = times.Count(v => v >= t);
+            double time = observations[index].First;
             int fails = 0, cens = 0;
-            for (int i = 0; i < n; i++)
-                if (times[i] == t) { if (censored[i]) cens++; else fails++; }
+            while (index < observations.Length && observations[index].First == time)
+            {
+                if (observations[index].Second) cens++;
+                else fails++;
+                index++;
+            }
+
             events += fails;
             if (fails > 0) s *= 1.0 - (double)fails / atRisk;
-            if (double.IsNaN(median) && s <= 0.5) median = t;
-            rows.Add(new KmRow(t, atRisk, fails, cens, s));
+            if (double.IsNaN(median) && s <= 0.5) median = time;
+            rows.Add(new KmRow(time, atRisk, fails, cens, s));
+            atRisk -= fails + cens;
         }
         return new KaplanMeierResult(rows, median, n, events);
+    }
+
+    private static void RequireLifeData(double[] values, bool positive)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        if (values.Length == 0)
+            throw new ArgumentException("At least one lifetime observation is required.", nameof(values));
+        StatGuard.Finite(values, nameof(values));
+        if (positive && values.Any(v => v <= 0))
+            throw new ArgumentOutOfRangeException(nameof(values), "This distribution requires strictly positive lifetimes.");
     }
 }
