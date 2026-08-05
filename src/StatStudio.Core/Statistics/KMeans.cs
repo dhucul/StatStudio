@@ -51,10 +51,11 @@ public static class KMeans
             for (int c = 0; c < k; c++)
             {
                 if (cnt[c] != 0) continue;
+                // Some cluster always holds >= 2 points here (n >= k and this one is empty),
+                // so MaxBy is safe — and O(n) rather than the O(n log n) full sort it replaces.
                 int farthest = Enumerable.Range(0, n)
                     .Where(i => cnt[assign[i]] > 1)
-                    .OrderByDescending(i => Dist2(data[i], centroids[assign[i]]))
-                    .First();
+                    .MaxBy(i => Dist2(data[i], centroids[assign[i]]));
                 int previous = assign[farthest];
                 assign[farthest] = c;
                 cnt[previous]--;

@@ -30,8 +30,11 @@ public static class RegressionExtensions
         int k = predictors.Length;
         if (k > 12) throw new ArgumentException("Best subsets is limited to 12 predictors.");
 
-        var full = Regression.Fit(y, predictors, names);
-        double mseFull = full.MsError;
+        // Only Mallows Cp needs the full model. A collinear full set is exactly the situation
+        // best-subsets is run to diagnose, so its failure must not abort the whole search.
+        double mseFull;
+        try { mseFull = Regression.Fit(y, predictors, names).MsError; }
+        catch (ArgumentException) { mseFull = double.NaN; }
         int n = y.Length;
 
         var models = new List<SubsetModel>();
@@ -86,10 +89,14 @@ public static class RegressionExtensions
 
         if (inModel.Count == 0)
         {
-            steps.Add("No predictor met the entry criterion.");
             int fallback = EnumerableArgMin(y, predictors, names);
             if (fallback < 0)
                 throw new ArgumentException("No nonsingular one-predictor model can be fit.", nameof(predictors));
+            // A model is still returned so the caller has something to report, but say plainly
+            // that it failed the criterion — otherwise the coefficient table reads as a result.
+            steps.Add($"No predictor met the entry criterion (alpha to enter = {alphaEnter:0.###}).");
+            steps.Add($"Showing the best single-predictor model ('{names[fallback]}') for reference only — " +
+                      "it did NOT meet the entry criterion and should not be interpreted as a selected model.");
             inModel.Add(fallback);
         }
 

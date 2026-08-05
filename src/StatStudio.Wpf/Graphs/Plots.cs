@@ -72,6 +72,7 @@ internal static class Plots
         for (int i = 0; i < series.Count; i++)
         {
             var sorted = Quantiles.Sorted(series[i].Values);
+            if (sorted.Length == 0) continue;   // First/Last below throw on an empty series
             double q1 = Quantiles.Percentile(sorted, 25);
             double med = Quantiles.Percentile(sorted, 50);
             double q3 = Quantiles.Percentile(sorted, 75);
@@ -192,7 +193,13 @@ internal static class Plots
         p.YLabel(chart.YLabel);
     }
 
-    public static void TimeSeriesFit(Plot p, string name, double[] actual, double[] fitted, double[] forecasts)
+    /// <param name="title">
+    /// Chart title. Defaults to a generic time-series caption; callers that are plotting a
+    /// specific method (trend, moving average, Winters, decomposition) pass their own so the
+    /// chart no longer disagrees with the window it sits in.
+    /// </param>
+    public static void TimeSeriesFit(Plot p, string name, double[] actual, double[] fitted, double[] forecasts,
+        string? title = null)
     {
         int n = actual.Length;
         var xs = Enumerable.Range(1, n).Select(i => (double)i).ToArray();
@@ -214,11 +221,13 @@ internal static class Plots
             fcl.LinePattern = LinePattern.Dashed; fcl.LegendText = "Forecast";
         }
         p.ShowLegend();
-        p.Title($"Time Series Plot of {name}");
+        p.Title(title ?? $"Time Series Plot of {name}");
         p.XLabel("Period"); p.YLabel(name);
     }
 
-    public static void ForecastPlot(Plot p, string name, double[] actual, double[] forecasts, double[] lower, double[] upper)
+    /// <param name="title">Chart title; defaults to the ARIMA caption. SARIMA callers pass their own.</param>
+    public static void ForecastPlot(Plot p, string name, double[] actual, double[] forecasts, double[] lower, double[] upper,
+        string? title = null)
     {
         int n = actual.Length;
         var xs = Enumerable.Range(1, n).Select(i => (double)i).ToArray();
@@ -236,7 +245,7 @@ internal static class Plots
             fc.Color = Color.FromHex("#5BA832"); fc.MarkerSize = 5; fc.LineWidth = 2; fc.LinePattern = LinePattern.Dashed; fc.LegendText = "Forecast";
         }
         p.ShowLegend();
-        p.Title($"ARIMA Forecast of {name}");
+        p.Title(title ?? $"ARIMA Forecast of {name}");
         p.XLabel("Period"); p.YLabel(name);
     }
 
@@ -275,24 +284,42 @@ internal static class Plots
         p.Axes.Margins(bottom: 0);
     }
 
-    public static void WeibullPlot(Plot p, string name, double[] times, double beta, double eta)
+    /// <param name="censored">
+    /// Right-censoring flags aligned to <paramref name="times"/>. Censored units are not plotted —
+    /// they never failed — but they still shift the plotting positions of the failures that follow
+    /// them, via Johnson's rank adjustment. Without that the points would spread as though nothing
+    /// had been censored and would no longer straddle the fitted line.
+    /// </param>
+    public static void WeibullPlot(Plot p, string name, double[] times, double beta, double eta,
+        bool[]? censored = null)
     {
-        var sorted = times.OrderBy(v => v).ToArray();
-        int n = sorted.Length;
-        var xs = new double[n];
-        var ys = new double[n];
-        for (int i = 0; i < n; i++)
+        int n = times.Length;
+        var flags = censored ?? new bool[n];
+        var order = Enumerable.Range(0, n).OrderBy(i => times[i]).ToArray();
+
+        var xs = new List<double>(n);
+        var ys = new List<double>(n);
+        double adjustedRank = 0;
+        for (int k = 0; k < n; k++)
         {
-            double prob = (i + 1 - 0.3) / (n + 0.4);
-            xs[i] = Math.Log(sorted[i]);
-            ys[i] = Math.Log(-Math.Log(1 - prob));
+            int i = order[k];
+            if (flags[i]) continue;                       // survivor: no failure to plot
+            int remaining = n - k;                        // this unit plus everything after it
+            adjustedRank += (n + 1 - adjustedRank) / (remaining + 1);
+            double prob = (adjustedRank - 0.3) / (n + 0.4);   // median rank
+            xs.Add(Math.Log(times[i]));
+            ys.Add(Math.Log(-Math.Log(1 - prob)));
         }
-        var sp = p.Add.ScatterPoints(xs, ys);
+        if (xs.Count == 0) return;
+
+        var sp = p.Add.ScatterPoints(xs.ToArray(), ys.ToArray());
         sp.Color = Accent; sp.MarkerSize = 6;
+        if (flags.Any(f => f)) sp.LegendText = $"Failures ({xs.Count} of {n})";
 
         double x0 = xs[0], x1 = xs[^1];
         var line = p.Add.Scatter(new[] { x0, x1 }, new[] { beta * (x0 - Math.Log(eta)), beta * (x1 - Math.Log(eta)) });
         line.Color = Color.FromHex("#E0900F"); line.MarkerSize = 0; line.LineWidth = 2;
+        if (flags.Any(f => f)) { line.LegendText = "MLE fit"; p.ShowLegend(); }
 
         p.Title($"Weibull Probability Plot of {name}");
         p.XLabel("ln(time)"); p.YLabel("ln(-ln(1 - p))");

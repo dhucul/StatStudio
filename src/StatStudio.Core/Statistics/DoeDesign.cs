@@ -18,8 +18,12 @@ public static class DoeDesign
     /// Full 2^k factorial design in coded units (±1), with optional replicates,
     /// center points (per replicate), and randomized run order.
     /// </summary>
+    /// <param name="seed">
+    /// Omit for a fresh run order on every design — randomization exists to break confounding with
+    /// time-ordered nuisance factors, which a fixed seed defeats. Pass a value to reproduce a design.
+    /// </param>
     public static FactorialDesign FullFactorial(int k, int replicates = 1, int centerPoints = 0,
-        bool randomize = true, int seed = 12345)
+        bool randomize = true, int? seed = null)
     {
         if (k < 2 || k > 7) throw new ArgumentException("Number of factors must be 2..7.");
         if (replicates < 1) throw new ArgumentOutOfRangeException(nameof(replicates));
@@ -66,7 +70,8 @@ public static class DoeDesign
         Catalog.Keys.Where(key => key.K == k).Select(key => key.Runs).OrderBy(r => r);
 
     /// <summary>2^(k-p) fractional factorial via standard generators, with resolution and defining relation.</summary>
-    public static FractionalDesign FractionalFactorial(int k, int runs, bool randomize = true, int seed = 12345)
+    /// <param name="seed">Omit for a fresh run order; pass a value to reproduce a design.</param>
+    public static FractionalDesign FractionalFactorial(int k, int runs, bool randomize = true, int? seed = null)
     {
         if (!Catalog.TryGetValue((k, runs), out var gens))
             throw new ArgumentException($"No standard fractional design for {k} factors in {runs} runs.");
@@ -104,17 +109,19 @@ public static class DoeDesign
 
     // ---- helpers -----------------------------------------------------------
 
-    private static List<DesignRun> Finalize(List<DesignRun> runs, bool randomize, int seed)
+    private static List<DesignRun> Finalize(List<DesignRun> runs, bool randomize, int? seed)
     {
         var order = Enumerable.Range(0, runs.Count).ToList();
         if (randomize)
         {
-            var rnd = new Random(seed);
+            var rnd = seed is null ? Random.Shared : new Random(seed.Value);
             for (int i = order.Count - 1; i > 0; i--) { int j = rnd.Next(i + 1); (order[i], order[j]) = (order[j], order[i]); }
         }
+        // RunOrder is assigned sequentially over the shuffled sequence, so the list is already
+        // in RunOrder — the trailing sort was a no-op.
         var final = new List<DesignRun>(runs.Count);
         for (int i = 0; i < order.Count; i++) final.Add(runs[order[i]] with { RunOrder = i + 1 });
-        return final.OrderBy(r => r.RunOrder).ToList();
+        return final;
     }
 
     private static (string Relation, int Resolution) DefiningRelation(string[] gens)

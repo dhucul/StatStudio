@@ -12,18 +12,18 @@ public static class AdvancedFormatters
         t.Add($"{r.FactorA}*{r.FactorB}", r.DfAB.ToString(), Fmt.N(r.SsAB), Fmt.N(r.MsAB), Fmt.N(r.FAB, 2), Fmt.P(r.PAB));
         t.Add("Error", r.DfError.ToString(), Fmt.N(r.SsError), Fmt.N(r.MsError), "", "");
         t.Add("Total", r.DfTotal.ToString(), Fmt.N(r.SsTotal), "", "", "");
-        var model = new TextTable("S", "R-sq").Row(Fmt.N(r.S), $"{r.RSquared * 100:0.00}%");
+        var model = new TextTable("S", "R-sq").Row(Fmt.N(r.S), Fmt.PctFixed(r.RSquared));
         return $"Two-way ANOVA: {response} versus {r.FactorA}, {r.FactorB}\n\n" +
                "Analysis of Variance\n" + t + "\n\n" + "Model Summary\n" + model;
     }
 
     public static string Tukey(TukeyResult r)
     {
-        var t = new TextTable("Comparison", "Difference", "SE", "T-Value", "Adj P", $"{r.Conf * 100:0.#}% CI").LeftAlign(0);
+        var t = new TextTable("Comparison", "Difference", "SE", "T-Value", "Adj P", $"{Fmt.Pct(r.Conf)} CI").LeftAlign(0);
         foreach (var c in r.Comparisons)
             t.Add($"{c.GroupA} - {c.GroupB}", Fmt.N(c.Difference), Fmt.N(c.Se),
                 Fmt.N(c.Q / Math.Sqrt(2), 2), Fmt.P(c.P), $"({Fmt.N(c.CiLow)}, {Fmt.N(c.CiHigh)})");
-        return $"Tukey Pairwise Comparisons ({r.Conf * 100:0.#}% simultaneous confidence)\n" +
+        return $"Tukey Pairwise Comparisons ({Fmt.Pct(r.Conf)} simultaneous confidence)\n" +
                $"Critical q = {Fmt.N(r.QCritical, 3)}\n\n" + t;
     }
 
@@ -35,7 +35,7 @@ public static class AdvancedFormatters
         var test = new TextTable("F-Value", "DF1", "DF2", "P-Value");
         test.Add(Fmt.N(r.F, 3), r.Df1.ToString(), r.Df2.ToString(), Fmt.P(r.P));
         return $"Test for Two Variances: {n1} vs {n2}\n\n" + t + "\n\n" +
-               $"{r.Conf * 100:0.#}% CI for variance ratio: ({Fmt.N(r.RatioCiLow)}, {Fmt.N(r.RatioCiHigh)})\n\n" +
+               $"{Fmt.Pct(r.Conf)} CI for variance ratio: ({Fmt.N(r.RatioCiLow)}, {Fmt.N(r.RatioCiHigh)})\n\n" +
                "F-Test (normal)\n" + test;
     }
 
@@ -57,7 +57,7 @@ public static class AdvancedFormatters
                 double.IsNaN(t.OddsRatio) ? "" : Fmt.N(t.OddsRatio, 4));
         double r2 = r.NullDeviance > 0 ? 1 - r.Deviance / r.NullDeviance : double.NaN;
         var summary = new TextTable("Deviance", "Null Deviance", "Pseudo R-sq (McFadden)", "N");
-        summary.Add(Fmt.N(r.Deviance, 2), Fmt.N(r.NullDeviance, 2), $"{r2 * 100:0.00}%", r.N.ToString());
+        summary.Add(Fmt.N(r.Deviance, 2), Fmt.N(r.NullDeviance, 2), Fmt.PctFixed(r2), r.N.ToString());
         return $"Binary Logistic Regression: {r.Response} versus {string.Join(", ", r.Predictors)}\n\n" +
                "Coefficients\n" + coef + "\n\n" + "Model Summary\n" + summary +
                (r.Converged ? "" : "\n\n[warning] IRLS did not fully converge.");
@@ -67,9 +67,16 @@ public static class AdvancedFormatters
     {
         var t = new TextTable("Vars", "R-sq", "R-sq(adj)", "Mallows Cp", "S", "Predictors").LeftAlign(5);
         foreach (var m in r.Models.Take(top))
-            t.Add(m.NumPredictors.ToString(), $"{m.RSquared * 100:0.00}", $"{m.RSquaredAdj * 100:0.00}",
+            t.Add(m.NumPredictors.ToString(), Fmt.PctFixed(m.RSquared), Fmt.PctFixed(m.RSquaredAdj),
                 Fmt.N(m.MallowsCp, 1), Fmt.N(m.S, 4), string.Join(", ", m.Predictors));
-        return "Best Subsets Regression (ranked by adjusted R-sq)\n\n" + t;
+
+        // Up to 2^k - 1 subsets are fitted but only `top` are shown. Saying so keeps the table from
+        // reading as the complete result set.
+        int shown = Math.Min(top, r.Models.Count);
+        string scope = r.Models.Count > shown
+            ? $"showing the top {shown} of {r.Models.Count} models fitted"
+            : $"all {r.Models.Count} model(s) fitted";
+        return $"Best Subsets Regression (ranked by adjusted R-sq; {scope})\n\n" + t;
     }
 
     public static string Stepwise(StepwiseResult r)

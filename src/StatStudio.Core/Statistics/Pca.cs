@@ -65,7 +65,13 @@ public static class Pca
             running += prop[c];
             cum[c] = running;
             var vec = evd.EigenVectors.Column(src);
-            for (int r = 0; r < p; r++) loadings[r, c] = vec[r];
+            // Eigenvector signs are arbitrary in any EVD, so the same data can yield +0.71 or -0.71
+            // across runtimes. Pin them: the largest-magnitude loading in each component is positive.
+            int lead = 0;
+            for (int r = 1; r < p; r++)
+                if (Math.Abs(vec[r]) > Math.Abs(vec[lead])) lead = r;
+            double sign = vec[lead] < 0 ? -1.0 : 1.0;
+            for (int r = 0; r < p; r++) loadings[r, c] = sign * vec[r];
         }
         return new PcaResult(names, n, eig, prop, cum, loadings);
     }

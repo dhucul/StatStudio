@@ -14,6 +14,11 @@ public static class GageRR
         double studyVarMultiplier = 6.0, double alphaToRemoveInteraction = 0.05)
     {
         StatGuard.Finite(measurement, nameof(measurement));
+        ArgumentNullException.ThrowIfNull(partLabels);
+        ArgumentNullException.ThrowIfNull(operatorLabels);
+        // p, o and r are derived below, before TwoWay gets a chance to validate lengths.
+        if (partLabels.Length != measurement.Length || operatorLabels.Length != measurement.Length)
+            throw new ArgumentException("Measurements, part labels and operator labels must have equal lengths.");
         if (!double.IsFinite(studyVarMultiplier) || studyVarMultiplier <= 0)
             throw new ArgumentOutOfRangeException(nameof(studyVarMultiplier), "The study variation multiplier must be positive and finite.");
         StatGuard.Probability(alphaToRemoveInteraction, nameof(alphaToRemoveInteraction));

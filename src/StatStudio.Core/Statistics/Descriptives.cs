@@ -43,9 +43,10 @@ public static class Descriptives
 
         double ss = 0;
         foreach (var v in values) ss += (v - mean) * (v - mean);
-        double variance = n > 1 ? ss / (n - 1) : 0.0;
+        // Spread is undefined for a single observation; Minitab prints "*", which Fmt renders from NaN.
+        double variance = n > 1 ? ss / (n - 1) : double.NaN;
         double sd = Math.Sqrt(variance);
-        double seMean = n > 0 ? sd / Math.Sqrt(n) : double.NaN;
+        double seMean = sd / Math.Sqrt(n);
 
         var sorted = Quantiles.Sorted(values);
         double min = sorted[0], max = sorted[n - 1];

@@ -2,15 +2,21 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
-        Title="Distribution Analysis" Height="Auto" Width="340" SizeToContent="Height"
+        Title="Distribution Analysis" Height="Auto" Width="380" SizeToContent="Height"
         WindowStartupLocation="CenterOwner">
     <StackPanel Margin="14">
         <DockPanel Margin="0,0,0,8">
-            <TextBlock Text="Failure times:" Width="120" VerticalAlignment="Center"/>
+            <TextBlock Text="Failure times:" Width="140" VerticalAlignment="Center"/>
             <ComboBox x:Name="TimesCombo"/>
         </DockPanel>
         <DockPanel Margin="0,0,0,8">
-            <TextBlock Text="Distribution:" Width="120" VerticalAlignment="Center"/>
+            <TextBlock Text="Censor column:" Width="140" VerticalAlignment="Center"/>
+            <ComboBox x:Name="CensorCombo"/>
+        </DockPanel>
+        <TextBlock Foreground="{DynamicResource TextDim}" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="Censor column: 1 = right-censored (still running at that time), 0 = failure. Choose (none) to treat every row as a failure."/>
+        <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="Distribution:" Width="140" VerticalAlignment="Center"/>
             <ComboBox x:Name="DistCombo"/>
         </DockPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">

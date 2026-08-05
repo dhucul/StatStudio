@@ -32,13 +32,21 @@ public static class Logistic
         Matrix<double>? xtwxInv = null;
         bool converged = false;
         int iter = 0;
+        var Xt = X.Transpose();                             // loop-invariant
+        var weighted = Matrix<double>.Build.Dense(n, p);    // reused scratch for W·X
         for (; iter < 50; iter++)
         {
             var eta = X * beta;
             var mu = eta.Map(Sigmoid);
             var w = mu.Map(m => Math.Max(m * (1 - m), 1e-9));
-            var Xt = X.Transpose();
-            var xtwx = Xt * Matrix<double>.Build.DenseOfDiagonalVector(w) * X;
+            // Scale the rows of X by w rather than forming the n x n diagonal W: materialising it
+            // cost n^2 doubles per iteration (800 MB at n = 10 000, allocated up to 50 times).
+            for (int i = 0; i < n; i++)
+            {
+                double wi = w[i];
+                for (int j = 0; j < p; j++) weighted[i, j] = X[i, j] * wi;
+            }
+            var xtwx = Xt * weighted;
             var grad = Xt * (Y - mu);
             var solved = RobustLinearAlgebra.SolveSquare(
                 xtwx, grad, "Cannot fit logistic regression — the weighted design matrix is singular.");

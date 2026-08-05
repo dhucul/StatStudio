@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MathNet.Numerics.Distributions;
 
 namespace StatStudio.Core.Statistics;
@@ -6,8 +7,33 @@ namespace StatStudio.Core.Statistics;
 /// The studentized range distribution (Tukey's q), by numerical integration.
 /// Used for Tukey HSD post-hoc comparisons.
 /// </summary>
+/// <remarks>
+/// This is the hottest numeric path in the app: <see cref="AnovaExtensions.Tukey"/> calls
+/// <see cref="CDF"/> once per pairwise comparison plus once per bisection step of
+/// <see cref="InverseCDF"/>, and every call runs an integral nested inside another integral.
+/// The inner grid is fixed, so the standard-normal density and CDF at each node are computed
+/// once for the process rather than on every evaluation.
+/// </remarks>
 public static class StudentizedRange
 {
+    private const double InnerLo = -8.0, InnerHi = 8.0;
+    private const int InnerSteps = 240;
+
+    private static readonly double[] InnerZ = BuildInnerGrid();
+    private static readonly double[] InnerPdf = InnerZ.Select(z => Normal.PDF(0, 1, z)).ToArray();
+    private static readonly double[] InnerCdf = InnerZ.Select(z => Normal.CDF(0, 1, z)).ToArray();
+
+    /// <summary>Chi-squared helpers keyed by df; both are pure functions of df and are reused across calls.</summary>
+    private static readonly ConcurrentDictionary<double, (ChiSquared Chi, double SMax)> ChiCache = new();
+
+    private static double[] BuildInnerGrid()
+    {
+        double h = (InnerHi - InnerLo) / InnerSteps;
+        var z = new double[InnerSteps + 1];
+        for (int i = 0; i <= InnerSteps; i++) z[i] = InnerLo + i * h;
+        return z;
+    }
+
     /// <summary>P(Q ≤ q) for k groups and df error degrees of freedom.</summary>
     public static double CDF(double q, int k, double df)
     {
@@ -16,15 +42,20 @@ public static class StudentizedRange
         if (double.IsInfinity(df) || df > 5000) return RangeCdf(q, k);
 
         // Integrate F_range(q·s)·f_S(s) ds, where S = sqrt(χ²_df / df).
-        var chi = new ChiSquared(df);
-        double sMax = Math.Sqrt(chi.InverseCumulativeDistribution(0.99999) / df);
+        var (chi, sMax) = ChiCache.GetOrAdd(df, d =>
+        {
+            var c = new ChiSquared(d);
+            return (c, Math.Sqrt(c.InverseCumulativeDistribution(0.99999) / d));
+        });
         return Simpson(1e-6, sMax, 160, s => RangeCdf(q * s, k) * chi.Density(df * s * s) * 2 * df * s);
     }
 
     public static double InverseCDF(double p, int k, double df)
     {
         double lo = 0, hi = 100;
-        for (int it = 0; it < 48; it++)
+        // 30 halvings of [0, 100] resolve q to ~1e-7 — far finer than anything reported, and
+        // 18 fewer full nested integrations than the 48 this used to run.
+        for (int it = 0; it < 30; it++)
         {
             double mid = 0.5 * (lo + hi);
             if (CDF(mid, k, df) < p) lo = mid; else hi = mid;
@@ -36,12 +67,16 @@ public static class StudentizedRange
     private static double RangeCdf(double w, int k)
     {
         if (w <= 0) return 0;
-        return Simpson(-8.0, 8.0, 240, z =>
+        double h = (InnerHi - InnerLo) / InnerSteps;
+        double sum = 0;
+        for (int i = 0; i <= InnerSteps; i++)
         {
-            double inner = Normal.CDF(0, 1, z) - Normal.CDF(0, 1, z - w);
-            if (inner <= 0) return 0;
-            return k * Normal.PDF(0, 1, z) * Math.Pow(inner, k - 1);
-        });
+            double inner = InnerCdf[i] - Normal.CDF(0, 1, InnerZ[i] - w);
+            double f = inner <= 0 ? 0 : k * InnerPdf[i] * Math.Pow(inner, k - 1);
+            int weight = (i == 0 || i == InnerSteps) ? 1 : (i % 2 == 0 ? 2 : 4);
+            sum += weight * f;
+        }
+        return sum * h / 3.0;
     }
 
     private static double Simpson(double a, double b, int n, Func<double, double> f)

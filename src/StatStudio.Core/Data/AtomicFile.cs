@@ -21,9 +21,19 @@ internal static class AtomicFile
             File.Move(temporaryPath, fullDestination);
     }
 
+    /// <summary>
+    /// Best-effort cleanup of the staging file. Callers invoke this from a <c>finally</c>, so a
+    /// failure here must never replace the real save error ("the file is open in Excel") with a
+    /// misleading one about a .tmp file.
+    /// </summary>
     public static void DeleteIfPresent(string temporaryPath)
     {
-        if (File.Exists(temporaryPath))
-            File.Delete(temporaryPath);
+        try
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 }

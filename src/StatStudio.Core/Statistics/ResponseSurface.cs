@@ -9,8 +9,9 @@ public sealed record RsmDesign(
 public static class ResponseSurface
 {
     /// <summary>Central composite design: factorial cube + axial (±α) + center points.</summary>
+    /// <param name="seed">Omit for a fresh run order; pass a value to reproduce a design.</param>
     public static RsmDesign CentralComposite(int k, int centerPoints = 4, bool faceCentered = false,
-        bool randomize = true, int seed = 12345)
+        bool randomize = true, int? seed = null)
     {
         if (k < 2 || k > 5) throw new ArgumentException("CCD supports 2..5 factors.");
         if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
@@ -36,7 +37,8 @@ public static class ResponseSurface
     }
 
     /// <summary>Box-Behnken design: all factor-pairs at ±1 (others 0) + center points (k = 3..5).</summary>
-    public static RsmDesign BoxBehnken(int k, int centerPoints = 3, bool randomize = true, int seed = 12345)
+    /// <param name="seed">Omit for a fresh run order; pass a value to reproduce a design.</param>
+    public static RsmDesign BoxBehnken(int k, int centerPoints = 3, bool randomize = true, int? seed = null)
     {
         if (k < 3 || k > 5) throw new ArgumentException("Box-Behnken supports 3..5 factors.");
         if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
@@ -91,17 +93,16 @@ public static class ResponseSurface
         return (preds.ToArray(), nm.ToArray());
     }
 
-    private static RsmDesign Finalize(string type, int k, double alpha, List<RsmRun> runs, bool randomize, int seed)
+    private static RsmDesign Finalize(string type, int k, double alpha, List<RsmRun> runs, bool randomize, int? seed)
     {
         var order = Enumerable.Range(0, runs.Count).ToList();
         if (randomize)
         {
-            var rnd = new Random(seed);
+            var rnd = seed is null ? Random.Shared : new Random(seed.Value);
             for (int i = order.Count - 1; i > 0; i--) { int j = rnd.Next(i + 1); (order[i], order[j]) = (order[j], order[i]); }
         }
         var final = new List<RsmRun>(runs.Count);
         for (int i = 0; i < order.Count; i++) final.Add(runs[order[i]] with { RunOrder = i + 1 });
-        final = final.OrderBy(r => r.RunOrder).ToList();
         var fnames = Enumerable.Range(0, k).Select(i => ((char)('A' + i)).ToString()).ToList();
         return new RsmDesign(type, k, runs.Count, alpha, fnames, final);
     }

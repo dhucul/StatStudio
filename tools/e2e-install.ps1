@@ -43,13 +43,16 @@ public class Cap {
         int w = r.R-r.L, ht = r.B-r.T;
         if (w <= 0 || ht <= 0) throw new InvalidOperationException("The application window has invalid bounds.");
         var b = new Bitmap(w,ht);
-        using(var g=Graphics.FromImage(b)) {
-            IntPtr hdc = g.GetHdc();
-            try {
-                if (!PrintWindow(h, hdc, 2)) throw new InvalidOperationException("The application window could not be rendered.");
+        try {
+            using(var g=Graphics.FromImage(b)) {
+                IntPtr hdc = g.GetHdc();
+                try {
+                    if (!PrintWindow(h, hdc, 2)) throw new InvalidOperationException("The application window could not be rendered.");
+                }
+                finally { g.ReleaseHdc(hdc); }
             }
-            finally { g.ReleaseHdc(hdc); }
         }
+        catch { b.Dispose(); throw; }   // the caller only disposes a bitmap it actually received
         return b;
     }
 }

@@ -12,7 +12,7 @@ public static class AnovaFormatter
         anova.Add("Total", r.DfTotal.ToString(), Fmt.N(r.SsTotal), "", "", "");
 
         var model = new TextTable("S", "R-sq", "R-sq(adj)");
-        model.Add(Fmt.N(r.PooledStDev), $"{r.RSquared * 100:0.00}%", $"{r.RSquaredAdj * 100:0.00}%");
+        model.Add(Fmt.N(r.PooledStDev), Fmt.PctFixed(r.RSquared), Fmt.PctFixed(r.RSquaredAdj));
 
         var means = new TextTable("Level", "N", "Mean", "StDev").LeftAlign(0);
         foreach (var g in r.Groups)

@@ -39,20 +39,24 @@ public static class TimeSeries
             acf[k] = denom > 0 ? num / denom : double.NaN;
         }
 
-        // Partial autocorrelation via Durbin-Levinson recursion.
+        // Partial autocorrelation via Durbin-Levinson. The recursion only ever reads row k-1, so
+        // two rolling vectors replace the full (maxLag+1)^2 matrix — that matrix reached 3.2 GB
+        // on a 20 000-point series and took the process out with an OutOfMemoryException.
         var pacf = new double[maxLag + 1];
-        var phi = new double[maxLag + 1, maxLag + 1];
-        if (maxLag >= 1) { pacf[1] = acf[1]; phi[1, 1] = acf[1]; }
+        var previous = new double[maxLag + 1];
+        var current = new double[maxLag + 1];
+        if (maxLag >= 1) { pacf[1] = acf[1]; previous[1] = acf[1]; }
         for (int k = 2; k <= maxLag; k++)
         {
             double num = acf[k];
-            for (int j = 1; j < k; j++) num -= phi[k - 1, j] * acf[k - j];
+            for (int j = 1; j < k; j++) num -= previous[j] * acf[k - j];
             double den = 1.0;
-            for (int j = 1; j < k; j++) den -= phi[k - 1, j] * acf[j];
+            for (int j = 1; j < k; j++) den -= previous[j] * acf[j];
             double phikk = den != 0 ? num / den : 0;
-            phi[k, k] = phikk;
-            for (int j = 1; j < k; j++) phi[k, j] = phi[k - 1, j] - phikk * phi[k - 1, k - j];
+            current[k] = phikk;
+            for (int j = 1; j < k; j++) current[j] = previous[j] - phikk * previous[k - j];
             pacf[k] = phikk;
+            (previous, current) = (current, previous);
         }
         return new AcfResult(n, acf, pacf);
     }

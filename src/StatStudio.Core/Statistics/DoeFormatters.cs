@@ -15,12 +15,17 @@ public static class DoeFormatters
                 double.IsNaN(term.T) ? "" : Fmt.N(term.T, 2),
                 double.IsNaN(term.P) ? "" : Fmt.P(term.P));
 
-        string model = $"S = {(double.IsNaN(r.S) ? "*" : Fmt.N(r.S, 4))}   R-sq = {r.RSquared * 100:0.00}%";
+        string model = $"S = {(double.IsNaN(r.S) ? "*" : Fmt.N(r.S, 4))}   R-sq = {Fmt.PctFixed(r.RSquared)}";
         string note = r.DfError <= 0
             ? "\n\n[saturated design: no pure-error df — judge significance from the Pareto/normal plot of effects]"
             : "";
+        // In a fractional design the estimates are alias sums, not isolated effects; report which.
+        string alias = r.Aliases.Count == 0
+            ? ""
+            : "\n\nAlias Structure (effects this design cannot separate)\n  " +
+              string.Join("\n  ", r.Aliases);
         return $"Factorial Analysis: {r.Response} versus {string.Join(", ", r.Factors)}\n\n" +
-               "Estimated Effects and Coefficients (coded units)\n" + t + "\n\n" + model + note;
+               "Estimated Effects and Coefficients (coded units)\n" + t + "\n\n" + model + note + alias;
     }
 
     public static string Mixture(MixtureDesignResult d) =>
@@ -36,7 +41,7 @@ public static class DoeFormatters
                 double.IsNaN(term.T) ? "" : Fmt.N(term.T, 2),
                 double.IsNaN(term.P) ? "" : Fmt.P(term.P));
         var model = new TextTable("S", "R-sq", "R-sq(adj)");
-        model.Add(Fmt.N(r.S, 4), $"{r.RSquared * 100:0.00}%", $"{r.RSquaredAdj * 100:0.00}%");
+        model.Add(Fmt.N(r.S, 4), Fmt.PctFixed(r.RSquared), Fmt.PctFixed(r.RSquaredAdj));
         return $"Mixture Regression: {r.Response} ({(r.Quadratic ? "quadratic" : "linear")} Scheffé model, no intercept)\n\n" +
                "Estimated Coefficients (component proportions)\n" + t + "\n\n" + "Model Summary\n" + model;
     }
@@ -52,8 +57,9 @@ public static class DoeFormatters
 
     public static string Rsm(RsmDesign d)
     {
-        string alpha = d.Type.StartsWith("Central") ? $", axial α = {d.Alpha:0.####}" : "";
-        var pts = d.RunList.GroupBy(r => r.PointType).Select(g => $"{g.Count()} {g.Key.ToLower()}");
+        string alpha = d.Type.StartsWith("Central", StringComparison.Ordinal) ? $", axial α = {Fmt.G(d.Alpha)}" : "";
+        // ToLowerInvariant: the Turkish locale maps 'I' to a dotless 'ı' in ToLower().
+        var pts = d.RunList.GroupBy(r => r.PointType).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}");
         return $"Created {d.Type} design: {d.Factors} factors, {d.Runs} runs ({string.Join(", ", pts)}){alpha}.\n" +
                $"Factors {string.Join(", ", d.FactorNames)} and a PtType column written to the worksheet.";
     }
@@ -74,7 +80,7 @@ public static class DoeFormatters
         foreach (var c in g.Components)
             vc.Add(c.Source, Fmt.N(c.Variance, 5), Fmt.N(c.PctContribution, 2));
 
-        var sv = new TextTable("Source", $"StudyVar ({g.StudyVarMultiplier:0.#}×SD)", "%Study Var").LeftAlign(0);
+        var sv = new TextTable("Source", $"StudyVar ({Fmt.G(g.StudyVarMultiplier)}×SD)", "%Study Var").LeftAlign(0);
         foreach (var c in g.Components)
             sv.Add(c.Source, Fmt.N(c.StudyVar, 4), Fmt.N(c.PctStudyVar, 2));
 

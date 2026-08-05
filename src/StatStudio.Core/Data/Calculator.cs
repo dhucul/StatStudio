@@ -57,8 +57,23 @@ public static class Calculator
         private readonly int _n;
         private readonly Dictionary<int, double[]> _colCache = new();
         private int _pos;
+        private int _depth;
+
+        /// <summary>
+        /// Recursion cap for the descent. Without it, "-----…x" or "((((…))))" overflows the stack,
+        /// and StackOverflowException cannot be caught — it terminates the process and the worksheet.
+        /// </summary>
+        private const int MaxDepth = 128;
 
         public Parser(string s, Worksheet ws) { _s = s; _ws = ws; _n = ws.RowCount; }
+
+        private void Enter()
+        {
+            if (++_depth > MaxDepth)
+                throw new FormatException($"Expression is nested more than {MaxDepth} levels deep.");
+        }
+
+        private void Leave() => _depth--;
 
         public Func<int, double> Parse()
         {
@@ -94,10 +109,15 @@ public static class Calculator
         // Unary minus binds looser than ^, so -x^2 = -(x^2) (mathematical convention).
         private Func<int, double> ParseUnary()
         {
-            char c = Peek();
-            if (c == '-') { _pos++; var o = ParseUnary(); return r => -o(r); }
-            if (c == '+') { _pos++; return ParseUnary(); }
-            return ParsePower();
+            Enter();
+            try
+            {
+                char c = Peek();
+                if (c == '-') { _pos++; var o = ParseUnary(); return r => -o(r); }
+                if (c == '+') { _pos++; return ParseUnary(); }
+                return ParsePower();
+            }
+            finally { Leave(); }
         }
 
         private Func<int, double> ParsePower()
@@ -109,13 +129,18 @@ public static class Calculator
 
         private Func<int, double> ParseAtom()
         {
-            SkipWs();
-            char c = Peek();
-            if (c == '(') { _pos++; var e = ParseExpr(); SkipWs(); Expect(')'); return e; }
-            if (c == '\'') return Column(ReadQuoted());
-            if (char.IsDigit(c) || c == '.') return Number();
-            if (char.IsLetter(c)) return Identifier();
-            throw new FormatException($"Unexpected character '{c}' at position {_pos}.");
+            Enter();
+            try
+            {
+                SkipWs();
+                char c = Peek();
+                if (c == '(') { _pos++; var e = ParseExpr(); SkipWs(); Expect(')'); return e; }
+                if (c == '\'') return Column(ReadQuoted());
+                if (char.IsDigit(c) || c == '.') return Number();
+                if (char.IsLetter(c)) return Identifier();
+                throw new FormatException($"Unexpected character '{c}' at position {_pos}.");
+            }
+            finally { Leave(); }
         }
 
         private Func<int, double> Number()

@@ -76,7 +76,9 @@ public static class HypothesisTests
             se = Math.Sqrt(v1 / n1 + v2 / n2);
             double num = Math.Pow(v1 / n1 + v2 / n2, 2);
             double den = Math.Pow(v1 / n1, 2) / (n1 - 1) + Math.Pow(v2 / n2, 2) / (n2 - 1);
-            df = num / den;
+            // Both samples constant => 0/0. A NaN df reaches StudentT's constructor and throws,
+            // so fall back to the pooled degrees of freedom; se is 0 there and t is NaN either way.
+            df = den > 0 ? num / den : n1 + n2 - 2;
         }
 
         double t = se > 0 ? diff / se : double.NaN;

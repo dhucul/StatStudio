@@ -41,8 +41,11 @@ internal static class DoeTests
         Check.Close(T("Constant").Coef, 10, "constant");
         Check.Close(T("A").Effect, 6, "effect A");
         Check.Close(T("B").Effect, 4, "effect B");
-        Check.Close(T("AB").Effect, 2, "effect AB");
+        Check.Close(T("A*B").Effect, 2, "effect A*B");
         Check.Close(T("A").Coef, 3, "coef A");
+        // Interaction terms are separated by '*' (as in RSM/mixture models) so multi-character
+        // factor names stay unambiguous, and terms are ordered by interaction order, not name length.
+        Check.Equal(string.Join(", ", fa.Terms.Select(t => t.Name)), "Constant, A, B, A*B", "term order");
 
         Check.Section("RSM — central composite design (k=2)");
         var ccd = ResponseSurface.CentralComposite(2, centerPoints: 3, faceCentered: false, randomize: false);

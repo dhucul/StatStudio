@@ -28,10 +28,12 @@ public static class Nonparametric
         double w1 = 0;
         for (int i = 0; i < n1; i++) w1 += ranks[i];
 
-        double u1 = w1 - n1 * (n1 + 1) / 2.0;
+        // Every product below is widened before multiplying: n1*(n1+1) and n1*n2 are int
+        // arithmetic that wraps negative past ~46 340 observations.
+        double u1 = w1 - (double)n1 * (n1 + 1) / 2.0;
         double u = Math.Min(u1, (double)n1 * n2 - u1);
 
-        double muU = n1 * n2 / 2.0;
+        double muU = (double)n1 * n2 / 2.0;
         double tie = Ranking.TieCorrection(all);
         double varU = ((double)n1 * n2 / 12.0) * ((n + 1) - tie / ((double)n * (n - 1)));
         double sd = Math.Sqrt(varU);
@@ -47,7 +49,9 @@ public static class Nonparametric
     {
         var diffs = x.Select(v => v - mu0).Where(d => d != 0).ToArray();
         int n = diffs.Length;
-        var absRanks = Ranking.Average(diffs.Select(Math.Abs).ToArray());
+        var absDiffs = diffs.Select(Math.Abs).ToArray();
+        var absRanks = Ranking.Average(absDiffs);
+
         double wPlus = 0, wMinus = 0;
         for (int i = 0; i < n; i++)
         {
@@ -55,9 +59,9 @@ public static class Nonparametric
             else wMinus += absRanks[i];
         }
 
-        double mu = n * (n + 1) / 4.0;
-        double tie = Ranking.TieCorrection(diffs.Select(Math.Abs).ToArray());
-        double varW = n * (n + 1) * (2.0 * n + 1) / 24.0 - tie / 48.0;
+        double mu = (double)n * (n + 1) / 4.0;
+        double tie = Ranking.TieCorrection(absDiffs);
+        double varW = (double)n * (n + 1) * (2.0 * n + 1) / 24.0 - tie / 48.0;
         double sd = Math.Sqrt(varW);
         double z = sd > 0 ? (wPlus - mu) / sd : double.NaN;
         double p = PFromZ(z, alt);
@@ -87,7 +91,7 @@ public static class Nonparametric
             h += rsum * rsum / gn;
             groupStats.Add((g.Name, gn, rsum / gn));
         }
-        h = 12.0 / (n * (n + 1)) * h - 3.0 * (n + 1);
+        h = 12.0 / ((double)n * (n + 1)) * h - 3.0 * (n + 1);   // n*(n+1) overflows int past ~46 340
 
         double tie = Ranking.TieCorrection(all);
         double c = 1 - tie / ((double)n * n * n - n);
@@ -127,8 +131,10 @@ public static class Nonparametric
         int runs = n == 0 ? 0 : 1;
         for (int i = 1; i < n; i++) if (signs[i] != signs[i - 1]) runs++;
 
-        double expected = 2.0 * nA * nB / n + 1;
-        double var = 2.0 * nA * nB * (2.0 * nA * nB - n) / ((double)n * n * (n - 1));
+        // A constant column leaves every value on the median, so n can be 0 or 1 and both
+        // expressions below divide by zero. Report the degenerate case as undefined instead.
+        double expected = n > 0 ? 2.0 * nA * nB / n + 1 : double.NaN;
+        double var = n > 1 ? 2.0 * nA * nB * (2.0 * nA * nB - n) / ((double)n * n * (n - 1)) : double.NaN;
         double sd = Math.Sqrt(var);
         double z = sd > 0 ? (runs - expected) / sd : double.NaN;
         double p = PFromZ(z, Alternative.TwoSided);

@@ -12,6 +12,9 @@ public enum TsFields
 
 public partial class TimeSeriesWindow : Window
 {
+    /// <summary>Upper bound on ACF/PACF lags; the PACF recursion is quadratic in this value.</summary>
+    private const int MaxLagLimit = 500;
+
     public string SeriesColumn => (string)SeriesCombo.SelectedItem;
     public bool Quadratic => TrendCombo.SelectedIndex == 1;
     public int Length { get; private set; } = 3;
@@ -76,7 +79,10 @@ public partial class TimeSeriesWindow : Window
         }
         if (MaxLagRow.Visibility == Visibility.Visible)
         {
-            if (!TestOptions.ParseInt(MaxLagBox.Text, out var ml) || ml < 0) { Warn("Maximum lag must be nonnegative."); return; }
+            // The Durbin-Levinson recursion behind the PACF is O(maxLag^2) in time, so the lag
+            // count needs a ceiling as well as a floor.
+            if (!TestOptions.ParseInt(MaxLagBox.Text, out var ml) || ml < 0 || ml > MaxLagLimit)
+            { Warn($"Maximum lag must be between 0 and {MaxLagLimit}."); return; }
             MaxLag = ml;
         }
         if (ForecastRow.Visibility == Visibility.Visible)

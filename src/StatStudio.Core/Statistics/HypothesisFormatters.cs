@@ -12,7 +12,9 @@ public static class HypothesisFormatters
         _ => "≠", // not-equal
     };
 
-    private static string Pct(double conf) => $"{conf * 100:0.#}%";
+    // Interpolated numeric formats use the current culture; Fmt is invariant, so Session output
+    // stayed consistent regardless of the machine locale.
+    private static string Pct(double conf) => Fmt.Pct(conf);
 
     private static string Ci(double lo, double hi)
     {

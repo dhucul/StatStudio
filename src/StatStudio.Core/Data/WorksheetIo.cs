@@ -11,6 +11,31 @@ public static class WorksheetIo
 {
     private static readonly char[] Delimiters = { ',', '\t', ';' };
 
+    /// <summary>Above this row count the xlsx writer skips column auto-fit, which measures every cell.</summary>
+    private const int AutoFitRowLimit = 5_000;
+
+    /// <summary>
+    /// Leading characters that make a spreadsheet treat a cell as a formula. Imported data is
+    /// untrusted, so exported cells are prefixed with an apostrophe to keep them literal text
+    /// (formula injection: =cmd|'/c ...'!A1, @SUM(...), +/-DDE payloads).
+    /// </summary>
+    private const string FormulaLeadIn = "=+-@\t\r";
+
+    /// <summary>
+    /// True when a cell would be evaluated as a formula. Numbers are exempt — "-5.2" and "+3e4"
+    /// start with a lead-in character but are ordinary values, and must round-trip untouched.
+    /// </summary>
+    private static bool NeedsFormulaGuard(string value) =>
+        value.Length > 0 &&
+        FormulaLeadIn.IndexOf(value[0]) >= 0 &&
+        !DataColumn.TryParse(value, out _);
+
+    /// <summary>Reverses <see cref="NeedsFormulaGuard"/>'s apostrophe so our own exports re-import unchanged.</summary>
+    private static string? StripFormulaGuard(string? value) =>
+        value is { Length: >= 2 } && value[0] == '\'' && FormulaLeadIn.IndexOf(value[1]) >= 0
+            ? value[1..]
+            : value;
+
     public static Worksheet ReadCsv(string path, bool? hasHeader = null)
     {
         using var reader = new StreamReader(path);
@@ -49,8 +74,9 @@ public static class WorksheetIo
 
     public static void WriteCsv(Worksheet ws, TextWriter writer, char delim = ',')
     {
+        int rowCount = ws.RowCount;   // Worksheet.RowCount is a Max() over every column — never re-evaluate per row.
         writer.WriteLine(string.Join(delim, ws.Columns.Select(c => Escape(c.Name, delim))));
-        for (int r = 0; r < ws.RowCount; r++)
+        for (int r = 0; r < rowCount; r++)
         {
             var cells = ws.Columns.Select(c => Escape(c[r] ?? string.Empty, delim));
             writer.WriteLine(string.Join(delim, cells));
@@ -62,7 +88,8 @@ public static class WorksheetIo
     public static Worksheet ReadXlsx(string path, bool? hasHeader = null)
     {
         using var wb = new XLWorkbook(path);
-        var sheet = wb.Worksheets.First();
+        var sheet = wb.Worksheets.FirstOrDefault()
+                    ?? throw new InvalidDataException("The workbook contains no worksheets.");
         var range = sheet.RangeUsed();
         var result = new Worksheet { Name = Path.GetFileNameWithoutExtension(path) };
         if (range is null) return result;
@@ -88,21 +115,31 @@ public static class WorksheetIo
         {
             using var wb = new XLWorkbook();
             var sheet = wb.AddWorksheet(SafeSheetName(ws.Name));
-            for (int j = 0; j < ws.ColumnCount; j++)
+            int rowCount = ws.RowCount, columnCount = ws.ColumnCount;
+            for (int j = 0; j < columnCount; j++)
                 sheet.Cell(1, j + 1).Value = ws.Columns[j].Name;
 
-            for (int r = 0; r < ws.RowCount; r++)
-                for (int j = 0; j < ws.ColumnCount; j++)
+            for (int r = 0; r < rowCount; r++)
+                for (int j = 0; j < columnCount; j++)
                 {
                     var raw = ws.Columns[j][r];
                     if (string.IsNullOrEmpty(raw)) continue;
                     if (ws.Columns[j].Type == ColumnType.Numeric && DataColumn.TryParse(raw, out var num))
+                    {
                         sheet.Cell(r + 2, j + 1).Value = num;
+                    }
                     else
-                        sheet.Cell(r + 2, j + 1).Value = raw;
+                    {
+                        var cell = sheet.Cell(r + 2, j + 1);
+                        cell.SetValue(raw);
+                        // quotePrefix keeps the text literal in Excel without storing an apostrophe,
+                        // so the value still round-trips byte-for-byte.
+                        if (NeedsFormulaGuard(raw)) cell.Style.IncludeQuotePrefix = true;
+                    }
                 }
             sheet.Row(1).Style.Font.Bold = true;
-            sheet.Columns().AdjustToContents();
+            // AdjustToContents measures every cell in every column — the dominant cost on a large export.
+            if (rowCount <= AutoFitRowLimit) sheet.Columns().AdjustToContents();
             wb.SaveAs(temporaryPath);
             AtomicFile.Commit(temporaryPath, path);
         }
@@ -136,7 +173,7 @@ public static class WorksheetIo
                 : Worksheet.DefaultName(j + 1);
             var col = ws.AddColumn(name);
             for (int r = dataStart; r < rows.Count; r++)
-                col.Add(j < rows[r].Count ? rows[r][j] : null);
+                col.Add(j < rows[r].Count ? StripFormulaGuard(rows[r][j]) : null);
             col.Type = col.LooksNumeric() ? ColumnType.Numeric : ColumnType.Text;
         }
         return ws;
@@ -283,6 +320,8 @@ public static class WorksheetIo
 
     private static string Escape(string value, char delim)
     {
+        if (NeedsFormulaGuard(value))
+            return "\"'" + value.Replace("\"", "\"\"") + "\"";
         if (value.IndexOf(delim) < 0 && value.IndexOf('"') < 0 &&
             value.IndexOf('\n') < 0 && value.IndexOf('\r') < 0)
             return value;

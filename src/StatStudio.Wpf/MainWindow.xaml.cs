@@ -296,8 +296,11 @@ public partial class MainWindow : Window
         Sheet.ItemsSource = _table.DefaultView;
         _dirty = markDirty;
         UpdateWorksheetHeader();
-        RefreshNavigator();
-        UpdateDims();
+        // ToWorksheet walks every cell of the grid; the navigator and the dimension readout used
+        // to run it once each, converting the whole table twice on every load.
+        var snapshot = WorksheetGrid.ToWorksheet(_table);
+        RefreshNavigator(snapshot);
+        UpdateDims(snapshot);
     }
 
     private void OnTableChanged(object? sender, DataColumnChangeEventArgs e) => MarkDirty();
@@ -332,7 +335,21 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (!ConfirmDiscardChanges()) e.Cancel = true;
+        if (!ConfirmDiscardChanges()) { e.Cancel = true; return; }
+        // A model fit can outlive the window; signal it so its continuation stops before
+        // touching torn-down controls.
+        _fitCancellation?.Cancel();
+    }
+
+    /// <summary>Cancellation for the one long-running model fit that may be in flight.</summary>
+    private CancellationTokenSource? _fitCancellation;
+
+    private CancellationTokenSource StartFit()
+    {
+        _fitCancellation?.Cancel();
+        var cts = new CancellationTokenSource();
+        _fitCancellation = cts;
+        return cts;
     }
 
     /// <summary>Current grid contents as a Core worksheet (commits any in-progress edit first).</summary>
@@ -342,10 +359,9 @@ public partial class MainWindow : Window
         return WorksheetGrid.ToWorksheet(_table);
     }
 
-    private void RefreshNavigator()
+    private void RefreshNavigator(CoreData.Worksheet ws)
     {
         NavList.Items.Clear();
-        var ws = WorksheetGrid.ToWorksheet(_table);
         NavList.Items.Add(ws.Name);
         foreach (var c in ws.Columns)
         {
@@ -354,37 +370,42 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UpdateDims()
-    {
-        var ws = WorksheetGrid.ToWorksheet(_table);
+    private void UpdateDims(CoreData.Worksheet ws) =>
         DimsText.Text = $"{ws.ColumnCount} cols × {ws.RowCount} rows";
-    }
 
     // ---- session output ----------------------------------------------------
 
-    internal void Log(string text)
+    /// <summary>Session text is capped; past this many characters the oldest half is dropped.</summary>
+    private const int SessionCharacterCap = 512_000;
+
+    internal void Log(string text) => Append(text + Environment.NewLine);
+
+    /// <summary>
+    /// Single append point for the Session pane. ScrollToEnd forces a layout pass, so it runs once
+    /// per block rather than once per line, and the buffer is bounded — an unbounded TextBox made
+    /// every later append re-lay out megabytes of text.
+    /// </summary>
+    private void Append(string block)
     {
-        Session.AppendText(text + Environment.NewLine);
+        Session.AppendText(block);
+        if (Session.Text.Length > SessionCharacterCap)
+            Session.Text = Session.Text[^(SessionCharacterCap / 2)..];
         Session.ScrollToEnd();
     }
 
     /// <summary>Append a titled output block, Minitab-style.</summary>
     internal void Output(string title, string body)
     {
-        Log("");
-        Log(title);
-        Log(new string('─', Math.Max(title.Length, 8)));
-        Log(body.TrimEnd());
-        Log("");
+        string nl = Environment.NewLine;
+        Append($"{nl}{title}{nl}{new string('─', Math.Max(title.Length, 8))}{nl}{body.TrimEnd()}{nl}{nl}");
         StatusText.Text = title;
     }
 
     /// <summary>Append a pre-formatted block whose first line is its own title.</summary>
     internal void OutputRaw(string body)
     {
-        Log("");
-        Log(body.TrimEnd());
-        Log("");
+        string nl = Environment.NewLine;
+        Append($"{nl}{body.TrimEnd()}{nl}{nl}");
         var first = body.Split('\n').FirstOrDefault();
         if (!string.IsNullOrWhiteSpace(first)) StatusText.Text = first.Trim();
     }
@@ -416,10 +437,20 @@ public partial class MainWindow : Window
     private void ShowGraph(string title, Action<ScottPlot.Plot> build)
     {
         var g = new GraphWindow(title) { Owner = this };
-        Plots.ApplyTheme(g.Plot);
-        build(g.Plot);
-        g.Render();
-        g.Show();
+        try
+        {
+            Plots.ApplyTheme(g.Plot);
+            build(g.Plot);
+            g.Render();
+            g.Show();
+        }
+        catch (Exception ex)
+        {
+            // WPF registers a Window in Application.Windows at construction, so an un-shown one
+            // leaks for the life of the process unless it is closed explicitly.
+            g.Close();
+            Log($"Graph '{title}' could not be drawn: {ex.Message}");
+        }
     }
 
     // ---- File menu ---------------------------------------------------------
@@ -437,12 +468,14 @@ public partial class MainWindow : Window
             Title = "Open data",
         };
         if (dlg.ShowDialog() != true) return;
+        // Ask before reading: a large workbook takes real time, and discarding it afterwards
+        // means the user waited for a file that was never going to be loaded.
+        if (!ConfirmDiscardChanges()) return;
         try
         {
             var ws = dlg.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
                 ? CoreData.WorksheetIo.ReadXlsx(dlg.FileName)
                 : CoreData.WorksheetIo.ReadCsv(dlg.FileName);
-            if (!ConfirmDiscardChanges()) return;
             LoadWorksheet(ws);
             Log($"Opened '{System.IO.Path.GetFileName(dlg.FileName)}' — {ws.ColumnCount} columns, {ws.RowCount} rows.");
         }
@@ -480,10 +513,10 @@ public partial class MainWindow : Window
             Title = "Open project",
         };
         if (dlg.ShowDialog() != true) return;
+        if (!ConfirmDiscardChanges()) return;
         try
         {
             var ws = CoreData.ProjectStore.Load(dlg.FileName);
-            if (!ConfirmDiscardChanges()) return;
             LoadWorksheet(ws);
             Log($"Opened project '{System.IO.Path.GetFileName(dlg.FileName)}'.");
         }
@@ -552,8 +585,12 @@ public partial class MainWindow : Window
         var x1 = ws.Find(dlg.Column1)!.NumericValues();
         var x2 = ws.Find(dlg.Column2)!.NumericValues();
         if (x1.Length < 2 || x2.Length < 2) { Log("Each sample needs at least 2 values."); return; }
-        var r = HypothesisTests.TwoSampleT(x1, x2, dlg.Pooled, dlg.Confidence, dlg.Alt);
-        OutputRaw(HypothesisFormatters.TwoSampleT(r, dlg.Column1, dlg.Column2));
+        try
+        {
+            var r = HypothesisTests.TwoSampleT(x1, x2, dlg.Pooled, dlg.Confidence, dlg.Alt);
+            OutputRaw(HypothesisFormatters.TwoSampleT(r, dlg.Column1, dlg.Column2));
+        }
+        catch (Exception ex) { Log($"2-Sample t: {ex.Message}"); }
     }
 
     private void OnPairedT(object sender, RoutedEventArgs e)
@@ -682,7 +719,9 @@ public partial class MainWindow : Window
         var x1 = ws.Find(dlg.Column1)!.NumericValues();
         var x2 = ws.Find(dlg.Column2)!.NumericValues();
         if (x1.Length < 2 || x2.Length < 2) { Log("Each sample needs at least 2 values."); return; }
-        OutputRaw(AdvancedFormatters.FTest(VarianceTests.FTest(x1, x2, dlg.Confidence), dlg.Column1, dlg.Column2));
+        // Throws when either column is constant — an ordinary selection, not a programming error.
+        try { OutputRaw(AdvancedFormatters.FTest(VarianceTests.FTest(x1, x2, dlg.Confidence), dlg.Column1, dlg.Column2)); }
+        catch (Exception ex) { Log($"2 Variances: {ex.Message}"); }
     }
 
     private void OnPolynomialRegression(object sender, RoutedEventArgs e)
@@ -744,7 +783,9 @@ public partial class MainWindow : Window
     {
         var dlg = new FisherWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        OutputRaw(MultivariateFormatters.Fisher(FishersExact.Test(dlg.CellA, dlg.CellB, dlg.CellC, dlg.CellD)));
+        // An all-zero table is accepted by the dialog but has no observations to test.
+        try { OutputRaw(MultivariateFormatters.Fisher(FishersExact.Test(dlg.CellA, dlg.CellB, dlg.CellC, dlg.CellD))); }
+        catch (Exception ex) { Log($"Fisher's exact test: {ex.Message}"); }
     }
 
     private void OnPca(object sender, RoutedEventArgs e)
@@ -792,8 +833,12 @@ public partial class MainWindow : Window
     {
         var dlg = new BayesProportionWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var r = Bayes.Proportion(dlg.X, dlg.N, dlg.PriorA, dlg.PriorB, dlg.Confidence, dlg.Threshold);
-        OutputRaw(BayesFormatters.Proportion(r, "Sample"));
+        try
+        {
+            var r = Bayes.Proportion(dlg.X, dlg.N, dlg.PriorA, dlg.PriorB, dlg.Confidence, dlg.Threshold);
+            OutputRaw(BayesFormatters.Proportion(r, "Sample"));
+        }
+        catch (Exception ex) { Log($"Bayesian proportion: {ex.Message}"); }
     }
 
     private void OnBayesNormal(object sender, RoutedEventArgs e)
@@ -804,10 +849,15 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() != true) return;
         var v = ws.Find(dlg.DataColumn)!.NumericValues();
         if (v.Length < 2) { Log("Need at least 2 values."); return; }
-        var r = dlg.KnownVariance
-            ? Bayes.NormalMeanKnownVar(v, dlg.PriorMean, dlg.PriorSd, dlg.KnownSigma, dlg.Confidence, dlg.Threshold)
-            : Bayes.NormalMeanUnknownVar(v, dlg.Confidence, dlg.Threshold);
-        OutputRaw(BayesFormatters.NormalMean(r, dlg.DataColumn));
+        // The Jeffreys-prior path requires variation in the sample.
+        try
+        {
+            var r = dlg.KnownVariance
+                ? Bayes.NormalMeanKnownVar(v, dlg.PriorMean, dlg.PriorSd, dlg.KnownSigma, dlg.Confidence, dlg.Threshold)
+                : Bayes.NormalMeanUnknownVar(v, dlg.Confidence, dlg.Threshold);
+            OutputRaw(BayesFormatters.NormalMean(r, dlg.DataColumn));
+        }
+        catch (Exception ex) { Log($"Bayesian normal mean: {ex.Message}"); }
     }
 
     private void OnBayesRegression(object sender, RoutedEventArgs e)
@@ -859,7 +909,22 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new DistFitWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var t = ws.Find(dlg.TimesColumn)!.NumericValues();
+        double[] t;
+        bool[]? censored = null;
+        if (dlg.CensorColumn is null)
+        {
+            t = ws.Find(dlg.TimesColumn)!.NumericValues();
+        }
+        else
+        {
+            // Row-aligned so a missing cell in either column drops the whole observation.
+            var (times, flags) = Columns.Pairwise(ws.Find(dlg.TimesColumn)!, ws.Find(dlg.CensorColumn)!);
+            if (flags.Any(v => v != 0 && v != 1))
+            { Log("Censoring indicators must be exactly 0 (failure) or 1 (right-censored)."); return; }
+            t = times;
+            censored = flags.Select(v => v == 1).ToArray();
+        }
+
         if (t.Length < 3) { Log("Need at least 3 observations."); return; }
         if (t.Any(v => v <= 0))
         { Log($"{dlg.Distribution} requires all times > 0."); return; }
@@ -867,16 +932,17 @@ public partial class MainWindow : Window
         {
             var fit = dlg.Distribution switch
             {
-                "Exponential" => Reliability.FitExponential(t),
-                "Lognormal" => Reliability.FitLognormal(t),
-                "Normal" => Reliability.FitNormal(t),
-                _ => Reliability.FitWeibull(t),
+                "Exponential" => Reliability.FitExponential(t, censored),
+                "Lognormal" => Reliability.FitLognormal(t, censored),
+                "Normal" => Reliability.FitNormal(t, censored),
+                _ => Reliability.FitWeibull(t, censored),
             };
             OutputRaw(ReliabilityFormatters.DistributionFit(fit, dlg.TimesColumn));
             if (dlg.Distribution == "Weibull")
             {
                 double beta = fit.Parameters[0].Value, eta = fit.Parameters[1].Value;
-                ShowGraph($"Weibull Plot of {dlg.TimesColumn}", p => Plots.WeibullPlot(p, dlg.TimesColumn, t, beta, eta));
+                ShowGraph($"Weibull Plot of {dlg.TimesColumn}",
+                    p => Plots.WeibullPlot(p, dlg.TimesColumn, t, beta, eta, censored));
             }
             else ShowGraph($"Histogram of {dlg.TimesColumn}", p => Plots.Histogram(p, dlg.TimesColumn, t));
         }
@@ -1060,7 +1126,10 @@ public partial class MainWindow : Window
         if (comps.Length < 2) { Log("Select at least two components."); return; }
         try
         {
-            var r = MixtureAnalysis.Fit(y, comps, dlg.Predictors, quadratic: true);
+            // The quadratic Scheffé model needs a run per cross-product term; a simplex-lattice
+            // {q,1} design cannot support it, so fall back to the linear model rather than failing.
+            int quadraticTerms = comps.Length + comps.Length * (comps.Length - 1) / 2;
+            var r = MixtureAnalysis.Fit(y, comps, dlg.Predictors, quadratic: y.Length > quadraticTerms);
             OutputRaw(DoeFormatters.MixtureModel(r));
         }
         catch (Exception ex) { Log($"Mixture analysis: {ex.Message}"); }
@@ -1171,9 +1240,14 @@ public partial class MainWindow : Window
         if (v is null) return;
         int minimum = dlg.Quadratic ? 4 : 3;
         if (v.Length < minimum) { Log($"Need at least {minimum} points."); return; }
-        var r = dlg.Quadratic ? TimeSeries.QuadraticTrend(v, dlg.Forecasts) : TimeSeries.LinearTrend(v, dlg.Forecasts);
-        OutputRaw(TimeSeriesFormatters.Trend(r, name, v.Length));
-        ShowGraph($"Trend Analysis of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+        try
+        {
+            var r = dlg.Quadratic ? TimeSeries.QuadraticTrend(v, dlg.Forecasts) : TimeSeries.LinearTrend(v, dlg.Forecasts);
+            OutputRaw(TimeSeriesFormatters.Trend(r, name, v.Length));
+            ShowGraph($"Trend Analysis of {name}",
+                p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Trend Analysis of {name}"));
+        }
+        catch (Exception ex) { Log($"Trend analysis: {ex.Message}"); }
     }
 
     private void OnMovingAverage(object sender, RoutedEventArgs e)
@@ -1181,9 +1255,14 @@ public partial class MainWindow : Window
         var v = OpenSeries("Moving Average", TsFields.Length | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
         if (v.Length < dlg.Length) { Log("Series shorter than the MA length."); return; }
-        var r = TimeSeries.MovingAverage(v, dlg.Length, dlg.Forecasts);
-        OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
-        ShowGraph($"Moving Average of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+        try
+        {
+            var r = TimeSeries.MovingAverage(v, dlg.Length, dlg.Forecasts);
+            OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
+            ShowGraph($"Moving Average of {name}",
+                p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Moving Average of {name}"));
+        }
+        catch (Exception ex) { Log($"Moving average: {ex.Message}"); }
     }
 
     private void OnSingleExp(object sender, RoutedEventArgs e)
@@ -1191,9 +1270,14 @@ public partial class MainWindow : Window
         var v = OpenSeries("Single Exponential Smoothing", TsFields.Alpha | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
         if (v.Length < 2) { Log("Need at least 2 points."); return; }
-        var r = TimeSeries.SingleExp(v, dlg.Alpha, dlg.Forecasts);
-        OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
-        ShowGraph($"Single Exp Smoothing of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+        try
+        {
+            var r = TimeSeries.SingleExp(v, dlg.Alpha, dlg.Forecasts);
+            OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
+            ShowGraph($"Single Exp Smoothing of {name}",
+                p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Single Exp Smoothing of {name}"));
+        }
+        catch (Exception ex) { Log($"Single exponential smoothing: {ex.Message}"); }
     }
 
     private void OnDoubleExp(object sender, RoutedEventArgs e)
@@ -1201,9 +1285,14 @@ public partial class MainWindow : Window
         var v = OpenSeries("Double Exponential Smoothing", TsFields.Alpha | TsFields.Beta | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
         if (v.Length < 3) { Log("Need at least 3 points."); return; }
-        var r = TimeSeries.DoubleExp(v, dlg.Alpha, dlg.Beta, dlg.Forecasts);
-        OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
-        ShowGraph($"Double Exp Smoothing of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+        try
+        {
+            var r = TimeSeries.DoubleExp(v, dlg.Alpha, dlg.Beta, dlg.Forecasts);
+            OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
+            ShowGraph($"Double Exp Smoothing of {name}",
+                p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Double Exp Smoothing of {name}"));
+        }
+        catch (Exception ex) { Log($"Double exponential smoothing: {ex.Message}"); }
     }
 
     private void OnWinters(object sender, RoutedEventArgs e)
@@ -1216,7 +1305,8 @@ public partial class MainWindow : Window
         {
             var r = TimeSeries.Winters(v, dlg.Period, dlg.Alpha, dlg.Beta, dlg.Gamma, dlg.Multiplicative, dlg.Forecasts);
             OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
-            ShowGraph($"Winters' Method of {name}", p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts));
+            ShowGraph($"Winters' Method of {name}",
+                p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Winters' Method of {name}"));
         }
         catch (Exception ex) { Log($"Winters: {ex.Message}"); }
     }
@@ -1226,9 +1316,15 @@ public partial class MainWindow : Window
         var v = OpenSeries("Time Series Decomposition", TsFields.Period | TsFields.Multiplicative, out var dlg, out var name);
         if (v is null) return;
         if (v.Length < 2 * dlg.Period) { Log("Need at least two full seasons."); return; }
-        var r = TimeSeries.Decompose(v, dlg.Period, dlg.Multiplicative);
-        OutputRaw(TimeSeriesFormatters.Decomposition(r, name));
-        ShowGraph($"Decomposition of {name} (trend)", p => Plots.TimeSeriesFit(p, name, v, r.Trend, Array.Empty<double>()));
+        // Multiplicative decomposition rejects non-positive observations (OnWinters already guards this).
+        try
+        {
+            var r = TimeSeries.Decompose(v, dlg.Period, dlg.Multiplicative);
+            OutputRaw(TimeSeriesFormatters.Decomposition(r, name));
+            ShowGraph($"Decomposition of {name} (trend)",
+                p => Plots.TimeSeriesFit(p, name, v, r.Trend, Array.Empty<double>(), $"Decomposition of {name} (trend)"));
+        }
+        catch (Exception ex) { Log($"Decomposition: {ex.Message}"); }
     }
 
     private async void OnArima(object sender, RoutedEventArgs e)
@@ -1238,20 +1334,26 @@ public partial class MainWindow : Window
         var dlg = new ArimaWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
-        ArimaResult? r = null;
         IsEnabled = false;
-        StatusText.Text = $"Fitting ARIMA model for {dlg.SeriesColumn}â€¦";
+        StatusText.Text = $"Fitting ARIMA model for {dlg.SeriesColumn}…";
+        using var cts = StartFit();
         try
         {
-            r = await Task.Run(() => Arima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.Forecasts, dlg.IncludeConstant));
+            var r = await Task.Run(() => Arima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.Forecasts, dlg.IncludeConstant),
+                cts.Token);
+            if (cts.IsCancellationRequested || !IsLoaded) return;
+
+            // Formatting and plotting stay inside the try: this is an async void method, so an
+            // exception after the await has no catch site and would terminate the process.
+            OutputRaw(TimeSeriesFormatters.Arima(r, dlg.SeriesColumn));
+            if (r.Forecasts.Length > 0)
+                ShowGraph($"ARIMA Forecast of {dlg.SeriesColumn}",
+                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper,
+                        $"ARIMA Forecast of {dlg.SeriesColumn}"));
         }
+        catch (OperationCanceledException) { Log("ARIMA: cancelled."); }
         catch (Exception ex) { Log($"ARIMA: {ex.Message}"); }
         finally { IsEnabled = true; }
-        if (r is null) return;
-        OutputRaw(TimeSeriesFormatters.Arima(r, dlg.SeriesColumn));
-        if (r.Forecasts.Length > 0)
-            ShowGraph($"ARIMA Forecast of {dlg.SeriesColumn}",
-                p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
     }
 
     private async void OnSarima(object sender, RoutedEventArgs e)
@@ -1261,21 +1363,24 @@ public partial class MainWindow : Window
         var dlg = new SarimaWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
         var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
-        SarimaResult? r = null;
         IsEnabled = false;
-        StatusText.Text = $"Fitting SARIMA model for {dlg.SeriesColumn}â€¦";
+        StatusText.Text = $"Fitting SARIMA model for {dlg.SeriesColumn}…";
+        using var cts = StartFit();
         try
         {
-            r = await Task.Run(() => Sarima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.SP, dlg.SD, dlg.SQ,
-                dlg.Season, dlg.Forecasts, dlg.IncludeConstant));
+            var r = await Task.Run(() => Sarima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.SP, dlg.SD, dlg.SQ,
+                dlg.Season, dlg.Forecasts, dlg.IncludeConstant), cts.Token);
+            if (cts.IsCancellationRequested || !IsLoaded) return;
+
+            OutputRaw(TimeSeriesFormatters.Sarima(r, dlg.SeriesColumn));
+            if (r.Forecasts.Length > 0)
+                ShowGraph($"SARIMA Forecast of {dlg.SeriesColumn}",
+                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper,
+                        $"SARIMA Forecast of {dlg.SeriesColumn}"));
         }
+        catch (OperationCanceledException) { Log("SARIMA: cancelled."); }
         catch (Exception ex) { Log($"SARIMA: {ex.Message}"); }
         finally { IsEnabled = true; }
-        if (r is null) return;
-        OutputRaw(TimeSeriesFormatters.Sarima(r, dlg.SeriesColumn));
-        if (r.Forecasts.Length > 0)
-            ShowGraph($"SARIMA Forecast of {dlg.SeriesColumn}",
-                p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper));
     }
 
     private void OnAcf(object sender, RoutedEventArgs e) => RunAcf(false);
@@ -1286,11 +1391,15 @@ public partial class MainWindow : Window
         var v = OpenSeries(partial ? "Partial Autocorrelation" : "Autocorrelation", TsFields.MaxLag, out var dlg, out var name);
         if (v is null) return;
         if (v.Length < 4) { Log("Need at least 4 points."); return; }
-        var r = TimeSeries.Autocorrelation(v, dlg.MaxLag);
-        OutputRaw(TimeSeriesFormatters.Acf(r, name, partial));
-        var vals = partial ? r.Pacf : r.Acf;
-        ShowGraph($"{(partial ? "PACF" : "ACF")} of {name}",
-            p => Plots.Acf(p, $"{(partial ? "PACF" : "ACF")} of {name}", vals, r.N, partial ? "PACF" : "ACF"));
+        try
+        {
+            var r = TimeSeries.Autocorrelation(v, dlg.MaxLag);
+            OutputRaw(TimeSeriesFormatters.Acf(r, name, partial));
+            var vals = partial ? r.Pacf : r.Acf;
+            ShowGraph($"{(partial ? "PACF" : "ACF")} of {name}",
+                p => Plots.Acf(p, $"{(partial ? "PACF" : "ACF")} of {name}", vals, r.N, partial ? "PACF" : "ACF"));
+        }
+        catch (Exception ex) { Log($"{(partial ? "PACF" : "ACF")}: {ex.Message}"); }
     }
 
     // ---- Nonparametrics ----------------------------------------------------
@@ -1391,8 +1500,13 @@ public partial class MainWindow : Window
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length < 3) { Log($"{n}: need at least 3 values."); continue; }
-            OutputRaw(NonparametricFormatters.AndersonDarling(Normality.AndersonDarling(v), n));
-            ShowGraph($"Probability Plot of {n}", p => Plots.ProbabilityPlot(p, n, v));
+            // Anderson-Darling requires variation; a constant column must not end the loop.
+            try
+            {
+                OutputRaw(NonparametricFormatters.AndersonDarling(Normality.AndersonDarling(v), n));
+                ShowGraph($"Probability Plot of {n}", p => Plots.ProbabilityPlot(p, n, v));
+            }
+            catch (Exception ex) { Log($"{n}: {ex.Message}"); }
         }
     }
     private void OnSimpleRegression(object sender, RoutedEventArgs e)

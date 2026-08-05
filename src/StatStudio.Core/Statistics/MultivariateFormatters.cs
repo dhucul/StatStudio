@@ -80,7 +80,9 @@ public static class MultivariateFormatters
         t.Add("Alternative", alt.ToString());
         t.Add("Alpha", Fmt.N(alpha, 3));
         t.Add("Effect", effectDescription);
-        t.Add("Sample size", sampleSize >= 100000 ? "*" : Fmt.N(sampleSize, 2));
+        // A bare "*" left the user guessing why no number appeared for a tiny effect size.
+        t.Add("Sample size", sampleSize >= 100_000 ? "> 100000 (effect too small to detect practically)"
+                                                   : Fmt.N(sampleSize, 2));
         t.Add("Power", Fmt.N(power, 4));
         return $"Power and Sample Size — {test}\n(solving for {solveFor}; normal approximation)\n\n" + t;
     }

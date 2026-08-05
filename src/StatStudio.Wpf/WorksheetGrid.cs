@@ -48,8 +48,10 @@ internal static class WorksheetGrid
         // Index of the last row that holds any value, so trailing blank rows (the empty
         // editing padding) are dropped and don't count as missing observations. Interior
         // blank cells are preserved as genuine missing values.
+        // Scanned from the bottom: this runs on every analysis, and the forward scan visited
+        // every cell of the grid even though only the final non-empty row is needed.
         int last = -1;
-        for (int r = 0; r < rows.Count; r++)
+        for (int r = rows.Count - 1; r >= 0 && last < 0; r--)
             foreach (DataColumn dc in table.Columns)
             {
                 var v = rows[r][dc];

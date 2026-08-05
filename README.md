@@ -26,7 +26,11 @@ WPF**, **Math.NET Numerics** (math) and **ScottPlot** (graphs).
 - **Mixed / hierarchical** — one-way random-effects (random-intercept) model: variance components,
   intraclass correlation, and shrinkage (BLUP) group estimates.
 - **Reliability / survival** — parametric life-data fitting (Weibull/exponential/lognormal/normal
-  MLE with percentiles + Weibull probability plot) and Kaplan-Meier survival (right-censoring).
+  MLE + Weibull probability plot) and Kaplan-Meier survival. Both accept an optional 0/1
+  **right-censoring** column; censored units contribute survival time to the likelihood, and the
+  probability plot uses Johnson rank-adjusted plotting positions. Parameters, percentiles and the
+  mean/StDev/median all carry **standard errors and confidence intervals** — observed Fisher
+  information for the parameters, the delta method for functions of them.
 - **DOE** — create full 2^k / 2^(k-p) fractional factorial designs (generators, resolution,
   defining relation), **response-surface** designs (central composite + Box-Behnken), and
   **mixture** designs (simplex-lattice + simplex-centroid); analyze 2-level factorials

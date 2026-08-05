@@ -34,7 +34,10 @@ public static class ProjectStore
         string temporaryPath = AtomicFile.CreateTemporaryPath(path);
         try
         {
-            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(dto, Options));
+            // Stream the document rather than materialising the whole indented JSON as one string,
+            // which doubles peak memory and lands a large worksheet on the LOH.
+            using (var stream = File.Create(temporaryPath))
+                JsonSerializer.Serialize(stream, dto, Options);
             AtomicFile.Commit(temporaryPath, path);
         }
         finally

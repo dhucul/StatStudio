@@ -43,7 +43,8 @@ public static class MixtureAnalysis
                 }
 
         int p = cols.Count;
-        if (n < p) throw new ArgumentException($"Need at least {p} runs for this mixture model.");
+        // n == p leaves zero residual df, so every standard error and p-value comes back NaN.
+        if (n <= p) throw new ArgumentException($"Need more than {p} runs for this mixture model.");
 
         var X = Matrix<double>.Build.Dense(n, p);
         for (int r = 0; r < n; r++) for (int c = 0; c < p; c++) X[r, c] = cols[c][r];

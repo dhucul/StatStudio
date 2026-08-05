@@ -31,8 +31,10 @@ public static class AnovaExtensions
             throw new ArgumentException("Factor labels cannot be empty.");
 
         int N = response.Length;
-        var aLevels = factorA.Distinct().OrderBy(s => s).ToList();
-        var bLevels = factorB.Distinct().OrderBy(s => s).ToList();
+        // Ordinal, not the culture-sensitive default: level order drives the labelled output rows,
+        // and this project pins invariant behaviour everywhere else for reproducibility.
+        var aLevels = factorA.Distinct(StringComparer.Ordinal).OrderBy(s => s, StringComparer.Ordinal).ToList();
+        var bLevels = factorB.Distinct(StringComparer.Ordinal).OrderBy(s => s, StringComparer.Ordinal).ToList();
         int a = aLevels.Count, b = bLevels.Count;
         if (a < 2 || b < 2)
             throw new ArgumentException("Each factor needs at least two levels.");

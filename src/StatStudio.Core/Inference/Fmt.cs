@@ -25,4 +25,16 @@ public static class Fmt
 
     public static string Int(double v) =>
         double.IsNaN(v) ? "*" : Math.Round(v).ToString(Inv);
+
+    /// <summary>
+    /// A 0..1 fraction as a percentage with trailing zeros trimmed (0.95 → "95%", 0.975 → "97.5%").
+    /// </summary>
+    public static string Pct(double fraction, int dp = 1) =>
+        double.IsNaN(fraction)
+            ? "*"
+            : (fraction * 100).ToString("0." + new string('#', Math.Max(1, dp)), Inv) + "%";
+
+    /// <summary>A 0..1 fraction as a percentage with fixed decimals (0.875 → "87.50%").</summary>
+    public static string PctFixed(double fraction, int dp = 2) =>
+        double.IsNaN(fraction) ? "*" : (fraction * 100).ToString("F" + dp, Inv) + "%";
 }

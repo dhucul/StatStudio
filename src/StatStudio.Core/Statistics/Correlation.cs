@@ -41,8 +41,8 @@ public static class Correlation
         StatGuard.Finite(y, nameof(y));
         int n = x.Length;
         if (n < 2) return (double.NaN, double.NaN, n);
-        var rx = Ranking.Average(x.Take(n).ToArray());
-        var ry = Ranking.Average(y.Take(n).ToArray());
+        var rx = Ranking.Average(x);
+        var ry = Ranking.Average(y);
         var (r, _, _) = Pearson(rx, ry);
         return (r, PFromR(r, n), n);
     }
@@ -54,12 +54,27 @@ public static class Correlation
         var R = new double[k, k];
         var P = new double[k, k];
         var N = new int[k, k];
+
+        // Parse each column once. Going through Columns.Pairwise per cell re-ran double.TryParse
+        // over both columns for every pair, so each column was re-parsed k-1 times.
+        int rowCount = k == 0 ? 0 : cols.Max(c => c.Count);
+        var parsed = new double[k][];
         for (int i = 0; i < k; i++)
         {
-            R[i, i] = 1; P[i, i] = double.NaN; N[i, i] = cols[i].NumericValues().Length;
+            var values = new double[rowCount];
+            for (int r = 0; r < rowCount; r++)
+                values[r] = !cols[i].IsMissing(r) && DataColumn.TryParse(cols[i][r], out var v)
+                    ? v
+                    : double.NaN;   // NaN marks "missing or unparseable"
+            parsed[i] = values;
+        }
+
+        for (int i = 0; i < k; i++)
+        {
+            R[i, i] = 1; P[i, i] = double.NaN; N[i, i] = parsed[i].Count(double.IsFinite);
             for (int j = i + 1; j < k; j++)
             {
-                var (xs, ys) = Columns.Pairwise(cols[i], cols[j]);
+                var (xs, ys) = CompletePairs(parsed[i], parsed[j]);
                 var (r, p, n) = spearman ? Spearman(xs, ys) : Pearson(xs, ys);
                 R[i, j] = R[j, i] = r;
                 P[i, j] = P[j, i] = p;
@@ -67,6 +82,21 @@ public static class Correlation
             }
         }
         return new CorrelationResult(cols.Select(c => c.Name).ToList(), R, P, N, spearman);
+    }
+
+    /// <summary>Row-aligned pairs from two pre-parsed columns, skipping rows missing in either.</summary>
+    private static (double[] X, double[] Y) CompletePairs(double[] x, double[] y)
+    {
+        int n = Math.Min(x.Length, y.Length);
+        var xs = new List<double>(n);
+        var ys = new List<double>(n);
+        for (int r = 0; r < n; r++)
+        {
+            if (!double.IsFinite(x[r]) || !double.IsFinite(y[r])) continue;
+            xs.Add(x[r]);
+            ys.Add(y[r]);
+        }
+        return (xs.ToArray(), ys.ToArray());
     }
 
     private static double PFromR(double r, int n)

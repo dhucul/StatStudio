@@ -44,13 +44,16 @@ public class WinCap {
         int w = r.Right - r.Left, ht = r.Bottom - r.Top;
         if (w <= 0 || ht <= 0) throw new InvalidOperationException("The window has invalid bounds.");
         var bmp = new Bitmap(w, ht);
-        using (var g = Graphics.FromImage(bmp)) {
-            IntPtr hdc = g.GetHdc();
-            try {
-                if (!PrintWindow(h, hdc, 2)) throw new InvalidOperationException("The window could not be rendered.");
+        try {
+            using (var g = Graphics.FromImage(bmp)) {
+                IntPtr hdc = g.GetHdc();
+                try {
+                    if (!PrintWindow(h, hdc, 2)) throw new InvalidOperationException("The window could not be rendered.");
+                }
+                finally { g.ReleaseHdc(hdc); }
             }
-            finally { g.ReleaseHdc(hdc); }
         }
+        catch { bmp.Dispose(); throw; }   // the caller only disposes a bitmap it actually received
         return bmp;
     }
 }

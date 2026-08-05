@@ -80,8 +80,10 @@ public static class NonparametricFormatters
     {
         var t = new TextTable("N", "Mean", "StDev", "AD", "P-Value");
         t.Add(r.N.ToString(), Fmt.N(r.Mean), Fmt.N(r.StDev), Fmt.N(r.ASquared, 3), Fmt.P(r.P));
-        string verdict = r.P < 0.05
-            ? "p < 0.05: reject normality."
+        // An undefined p-value is not evidence of normality, so it must not fall through to the
+        // "fail to reject" branch (NaN compares false against every threshold).
+        string verdict = double.IsNaN(r.P) ? "p-value undefined: the test is inconclusive."
+            : r.P < 0.05 ? "p < 0.05: reject normality."
             : "p >= 0.05: fail to reject normality.";
         return $"Anderson-Darling Normality Test: {name}\n\n" + t + "\n\n" + verdict;
     }

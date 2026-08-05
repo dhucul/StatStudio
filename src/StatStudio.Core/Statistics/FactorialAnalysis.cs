@@ -6,7 +6,8 @@ public sealed record FactorialTerm(string Name, double Effect, double Coef, doub
 
 public sealed record FactorialResult(
     string Response, IReadOnlyList<string> Factors, IReadOnlyList<FactorialTerm> Terms,
-    double S, double RSquared, int N, int DfError);
+    double S, double RSquared, int N, int DfError,
+    IReadOnlyList<string> Aliases);
 
 /// <summary>
 /// Analysis of a 2-level factorial design (orthogonal ±1 coding). Computes effects,
@@ -48,8 +49,13 @@ public static class FactorialAnalysis
                 cornerGroups[key] = cornerGroups.GetValueOrDefault(key) + 1;
             }
         }
-        if (cornerGroups.Count != (1 << k) || cornerGroups.Values.Distinct().Count() != 1)
-            throw new ArgumentException("Factorial corner combinations must be complete and balanced.");
+        // A full design has all 2^k corners; a regular 2^(k-p) fraction has a power-of-two subset of
+        // them. Requiring the full set rejected every fractional design DoeDesign can generate.
+        int distinctCorners = cornerGroups.Count;
+        bool isRegularDesign = distinctCorners >= 2 && (distinctCorners & (distinctCorners - 1)) == 0;
+        if (!isRegularDesign || distinctCorners > (1 << k) || cornerGroups.Values.Distinct().Count() != 1)
+            throw new ArgumentException(
+                "Factorial runs must form a balanced full or regular fractional (2^(k-p)) design.");
 
         double yBar = y.Average();
         double ssTotal = y.Sum(v => (v - yBar) * (v - yBar));
@@ -68,12 +74,35 @@ public static class FactorialAnalysis
         StudentT? tDist = dfPe > 0 ? new StudentT(0, 1, dfPe) : null;
 
         var terms = new List<FactorialTerm> { new("Constant", double.NaN, yBar, double.NaN, double.NaN, double.NaN) };
+        var termOrder = new List<int>();          // interaction order, parallel to terms[1..]
+        var aliases = new List<string>();         // effects a fractional design cannot separate
         double ssModel = 0;
-        for (int mask = 1; mask < (1 << k); mask++)
+        var seenContrasts = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // Walk masks by interaction order so that, in a fractional design, each alias group is
+        // represented by its lowest-order effect (A rather than BCD) — the usual convention.
+        var masks = Enumerable.Range(1, (1 << k) - 1)
+            .OrderBy(m => System.Numerics.BitOperations.PopCount((uint)m))
+            .ThenBy(m => m);
+
+        foreach (int mask in masks)
         {
             var idx = Enumerable.Range(0, k).Where(b => (mask & (1 << b)) != 0).ToArray();
             var col = new double[n];
             for (int i = 0; i < n; i++) { double v = 1; foreach (var b in idx) v *= coded[b][i]; col[i] = v; }
+
+            string label = string.Join("*", idx.Select(b => factorNames[b]));
+
+            // Two terms with an identical contrast column are aliased; they carry one estimate,
+            // not two, so the later one is dropped rather than double-counted into ssModel.
+            string signature = string.Concat(col.Select(v => v > 0 ? '+' : v < 0 ? '-' : '0'));
+            if (seenContrasts.TryGetValue(signature, out var alias))
+            {
+                aliases.Add($"{alias} = {label}");
+                continue;
+            }
+            seenContrasts[signature] = label;
+
             double dot = 0, ss = 0;
             for (int i = 0; i < n; i++) { dot += col[i] * y[i]; ss += col[i] * col[i]; }
             if (ss == 0) continue;
@@ -83,13 +112,21 @@ public static class FactorialAnalysis
             double se = tDist != null ? Math.Sqrt(msErr / ss) : double.NaN;
             double t = tDist != null && se > 0 ? coef / se : double.NaN;
             double p = tDist != null && !double.IsNaN(t) ? 2 * (1 - tDist.CumulativeDistribution(Math.Abs(t))) : double.NaN;
-            terms.Add(new FactorialTerm(string.Concat(idx.Select(b => factorNames[b])), effect, coef, se, t, p));
+            terms.Add(new FactorialTerm(label, effect, coef, se, t, p));
+            termOrder.Add(idx.Length);
         }
 
-        // Order: constant, then by interaction order, then by appearance.
-        var ordered = terms.OrderBy(t => t.Name == "Constant" ? -1 : t.Name.Length).ToList();
+        // Constant first, then by interaction order. Sorting on Name.Length was wrong the moment
+        // factor names differed in length: with factors A, B and Concentration, the 2-way term
+        // "A*B" sorted ahead of the main effect "Concentration".
+        var ordered = terms
+            .Select((term, i) => (term, rank: i == 0 ? -1 : termOrder[i - 1]))
+            .OrderBy(x => x.rank)
+            .Select(x => x.term)
+            .ToList();
         double r2 = ssTotal > 0 ? ssModel / ssTotal : double.NaN;
-        return new FactorialResult(response, factorNames, ordered, double.IsNaN(msErr) ? double.NaN : Math.Sqrt(msErr), r2, n, dfPe);
+        return new FactorialResult(response, factorNames, ordered,
+            double.IsNaN(msErr) ? double.NaN : Math.Sqrt(msErr), r2, n, dfPe, aliases);
     }
 
     private static bool Near(double value, double expected) => Math.Abs(value - expected) <= 1e-8;

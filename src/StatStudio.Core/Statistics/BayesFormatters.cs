@@ -4,7 +4,7 @@ namespace StatStudio.Core.Statistics;
 
 public static class BayesFormatters
 {
-    private static string Pct(double c) => $"{c * 100:0.#}%";
+    private static string Pct(double c) => Fmt.Pct(c);
 
     public static string Proportion(BayesProportionResult r, string label)
     {
