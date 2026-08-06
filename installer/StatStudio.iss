@@ -18,10 +18,9 @@ DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupIconFile=..\src\StatStudio.Wpf\app.ico
-; Per-user install with no UAC prompt, as documented in README.md. {autopf} resolves to
-; {localappdata}\Programs here; pass /ALLUSERS on the command line for a machine-wide install.
-PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=commandline
+; Install machine-wide. In administrative install mode, {autopf} resolves to the system's
+; main Program Files folder instead of the current user's {localappdata}\Programs folder.
+PrivilegesRequired=admin
 ; NOTE: do not set DisableDirPage=yes here — Inno ignores the /DIR= command-line switch when the
 ; directory page is disabled, and tools/e2e-install.ps1 relies on /DIR to install into an isolated
 ; test folder. The [InstallDelete] section below is scoped to this installer's own payload instead,

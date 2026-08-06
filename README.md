@@ -76,7 +76,8 @@ powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1   # -> di
 powershell -ExecutionPolicy Bypass -File tools/e2e-install.ps1 -InstallDir C:\temp\StatStudio-e2e
 ```
 
-Self-contained win-x64 (no .NET prerequisite); installs **per-user** (no UAC).
+Self-contained win-x64 (no .NET prerequisite); installs machine-wide under **Program Files**
+and requests administrator approval.
 
 ## Scope
 
