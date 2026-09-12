@@ -46,3 +46,18 @@ Header sorting is deliberately disabled rather than allowing visual order to sil
 Cancellation is cooperative. Third-party workbook/matrix calls finish their current call before the surrounding cancellation checks can take effect. Existing files that already lost precision or apostrophes cannot have their original values reconstructed by these fixes.
 
 Implementation references checked: [ClosedXML cell-value semantics](https://docs.closedxml.io/en/latest/api/index.html), [Inno Setup installation order](https://jrsoftware.org/ishelp/topic_installorder.htm), and [Inno Setup directory enumeration](https://jrsoftware.org/ishelp/topic_isxfunc_findfirst.htm).
+
+## Installer upgrade correction — 2.2.2
+
+The initial folder guard used a registry identity with one trailing brace, while released
+installers registered an identity with two. That incorrectly rejected the existing installation.
+`installer/AppIdentity.iss` now supplies the unchanged deployed identity to both `[Setup]` and
+the registration lookup. The lookup checks machine/user registrations in both registry views.
+
+The shared Pascal validation code was exercised against the actual installed 2.2.0 directory,
+case-insensitive paths, empty/new directories, and an unrelated nonempty directory. All cases
+passed, and hashes confirmed the installed application and unrelated file were unchanged.
+The probe always aborts in `InitializeSetup`; it does not perform an installation.
+
+To repeat this check, compile `tools/installer-upgrade-probe.iss`, then run
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools/test-installer-upgrade.ps1 -InstalledDir "C:\Program Files\StatStudio"`.

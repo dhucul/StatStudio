@@ -3,12 +3,13 @@
 ; Produces dist\StatStudioSetup.exe from the self-contained publish in dist\publish.
 
 #define MyAppName "StatStudio"
-#define MyAppVersion "2.2.1"
+#define MyAppVersion "2.2.2"
 #define MyAppPublisher "StatStudio"
 #define MyAppExeName "StatStudio.exe"
+#include "AppIdentity.iss"
 
 [Setup]
-AppId={{F2A7C3D1-9B4E-4A6F-8C2D-1E5B7A9F3C04}}
+AppId={#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -58,36 +59,9 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-function IsRegisteredTarget(const Target: String): Boolean;
-var
-  Previous: String;
-begin
-  Result := RegQueryStringValue(HKLM64,
-    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{F2A7C3D1-9B4E-4A6F-8C2D-1E5B7A9F3C04}_is1',
-    'InstallLocation', Previous);
-  if Result then
-    Result := CompareText(RemoveBackslashUnlessRoot(ExpandFileName(Previous)),
-      RemoveBackslashUnlessRoot(ExpandFileName(Target))) = 0;
-end;
+#include "UpgradeTarget.iss"
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-  Target: String;
-  Entry: TFindRec;
 begin
-  Result := '';
-  Target := ExpandConstant('{app}');
-  if IsRegisteredTarget(Target) then exit;
-  if FindFirst(AddBackslash(Target) + '*', Entry) then begin
-    try
-      repeat
-        if (Entry.Name <> '.') and (Entry.Name <> '..') then begin
-          Result := 'Choose an empty folder or the registered StatStudio installation folder. Existing unrelated files will not be overwritten.';
-          exit;
-        end;
-      until not FindNext(Entry);
-    finally
-      FindClose(Entry);
-    end;
-  end;
+  Result := ValidateInstallTarget(ExpandConstant('{app}'));
 end;
