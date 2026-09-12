@@ -50,13 +50,15 @@ public static class StudentizedRange
         return Simpson(1e-6, sMax, 160, s => RangeCdf(q * s, k) * chi.Density(df * s * s) * 2 * df * s);
     }
 
-    public static double InverseCDF(double p, int k, double df)
+    public static double InverseCDF(double p, int k, double df, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         double lo = 0, hi = 100;
         // 30 halvings of [0, 100] resolve q to ~1e-7 — far finer than anything reported, and
         // 18 fewer full nested integrations than the 48 this used to run.
         for (int it = 0; it < 30; it++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double mid = 0.5 * (lo + hi);
             if (CDF(mid, k, df) < p) lo = mid; else hi = mid;
         }

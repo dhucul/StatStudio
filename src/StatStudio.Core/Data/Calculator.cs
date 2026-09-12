@@ -9,25 +9,63 @@ namespace StatStudio.Core.Data;
 /// </summary>
 public static class Calculator
 {
-    public static double[] Evaluate(string expression, Worksheet ws)
+    public static int EvaluateIntoColumn(string expression, Worksheet ws, string target, CancellationToken cancellationToken = default)
     {
-        var parser = new Parser(expression, ws);
+        if (string.IsNullOrWhiteSpace(target)) throw new ArgumentException("Enter a destination column.", nameof(target));
+        // Finish every evaluation before replacing the destination (including self-reference).
+        var result = Evaluate(expression, ws, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var col = ws.Find(target) ?? ws.AddColumn(target);
+        col.Clear();
+        col.Type = ColumnType.Numeric;
+        foreach (var value in result) col.AddNumber(value);
+        return result.Length;
+    }
+
+    public static double[] Evaluate(string expression, Worksheet ws, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(expression);
+        ArgumentNullException.ThrowIfNull(ws);
+        // Bounds both parsing work and the depth of generated delegate calls, including
+        // flat operator chains which do not increase the recursive-descent depth.
+        if (expression.Length > 2048)
+            throw new FormatException("Expressions are limited to 2048 characters. Split this calculation into columns.");
+        var parser = new Parser(expression, ws, cancellationToken);
         var node = parser.Parse();
         int n = ws.RowCount;
         var result = new double[n];
-        for (int r = 0; r < n; r++) result[r] = node(r);
+        for (int r = 0; r < n; r++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            result[r] = node(r);
+            if (double.IsInfinity(result[r]))
+                throw new ArithmeticException($"Calculation overflow or division by zero in row {r + 1}.");
+        }
         return result;
     }
 
     private static readonly Dictionary<string, Func<double, double>> Unary = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["sqrt"] = Math.Sqrt, ["abs"] = Math.Abs, ["exp"] = Math.Exp,
-        ["log"] = Math.Log, ["ln"] = Math.Log, ["loge"] = Math.Log,
-        ["log10"] = Math.Log10, ["logten"] = Math.Log10,
-        ["sin"] = Math.Sin, ["cos"] = Math.Cos, ["tan"] = Math.Tan,
-        ["asin"] = Math.Asin, ["acos"] = Math.Acos, ["atan"] = Math.Atan,
-        ["round"] = x => Math.Round(x), ["floor"] = Math.Floor,
-        ["ceil"] = Math.Ceiling, ["ceiling"] = Math.Ceiling, ["int"] = Math.Truncate,
+        ["sqrt"] = Math.Sqrt,
+        ["abs"] = Math.Abs,
+        ["exp"] = Math.Exp,
+        ["log"] = Math.Log,
+        ["ln"] = Math.Log,
+        ["loge"] = Math.Log,
+        ["log10"] = Math.Log10,
+        ["logten"] = Math.Log10,
+        ["sin"] = Math.Sin,
+        ["cos"] = Math.Cos,
+        ["tan"] = Math.Tan,
+        ["asin"] = Math.Asin,
+        ["acos"] = Math.Acos,
+        ["atan"] = Math.Atan,
+        ["round"] = x => Math.Round(x),
+        ["floor"] = Math.Floor,
+        ["ceil"] = Math.Ceiling,
+        ["ceiling"] = Math.Ceiling,
+        ["int"] = Math.Truncate,
     };
 
     private static readonly Dictionary<string, Func<IReadOnlyList<double>, double>> Aggregate = new(StringComparer.OrdinalIgnoreCase)
@@ -38,7 +76,8 @@ public static class Calculator
         ["max"] = v => v.Max(),
         ["n"] = v => v.Count,
         ["median"] = v => { var s = v.OrderBy(x => x).ToArray(); int m = s.Length; return m == 0 ? double.NaN : m % 2 == 1 ? s[m / 2] : (s[m / 2 - 1] + s[m / 2]) / 2; },
-        ["stdev"] = StdDev, ["std"] = StdDev,
+        ["stdev"] = StdDev,
+        ["std"] = StdDev,
     };
 
     private static double StdDev(IReadOnlyList<double> v)
@@ -58,6 +97,7 @@ public static class Calculator
         private readonly Dictionary<int, double[]> _colCache = new();
         private int _pos;
         private int _depth;
+        private readonly CancellationToken _cancellationToken;
 
         /// <summary>
         /// Recursion cap for the descent. Without it, "-----…x" or "((((…))))" overflows the stack,
@@ -65,7 +105,8 @@ public static class Calculator
         /// </summary>
         private const int MaxDepth = 128;
 
-        public Parser(string s, Worksheet ws) { _s = s; _ws = ws; _n = ws.RowCount; }
+        public Parser(string s, Worksheet ws, CancellationToken cancellationToken)
+        { _s = s; _ws = ws; _n = ws.RowCount; _cancellationToken = cancellationToken; }
 
         private void Enter()
         {
@@ -135,7 +176,7 @@ public static class Calculator
                 SkipWs();
                 char c = Peek();
                 if (c == '(') { _pos++; var e = ParseExpr(); SkipWs(); Expect(')'); return e; }
-                if (c == '\'') return Column(ReadQuoted());
+                if (c == '\'') return Column(ReadQuoted(), byNameOnly: true);
                 if (char.IsDigit(c) || c == '.') return Number();
                 if (char.IsLetter(c)) return Identifier();
                 throw new FormatException($"Unexpected character '{c}' at position {_pos}.");
@@ -172,25 +213,31 @@ public static class Calculator
             if (Aggregate.TryGetValue(name, out var agg))
             {
                 var vals = new List<double>(_n);
-                for (int r = 0; r < _n; r++) { double v = arg(r); if (!double.IsNaN(v)) vals.Add(v); }
+                for (int r = 0; r < _n; r++)
+                {
+                    _cancellationToken.ThrowIfCancellationRequested();
+                    double v = arg(r);
+                    if (double.IsInfinity(v)) throw new ArithmeticException($"Non-finite aggregate input in row {r + 1}.");
+                    if (!double.IsNaN(v)) vals.Add(v);
+                }
                 double result = vals.Count > 0 ? agg(vals) : double.NaN;
                 return _ => result;
             }
             throw new FormatException($"Unknown function '{name}'.");
         }
 
-        private Func<int, double> Column(string name)
+        private Func<int, double> Column(string name, bool byNameOnly = false)
         {
-            int idx = ResolveColumn(name);
+            int idx = ResolveColumn(name, byNameOnly);
             var vals = ColumnValues(idx);
             return r => r < vals.Length ? vals[r] : double.NaN;
         }
 
-        private int ResolveColumn(string name)
+        private int ResolveColumn(string name, bool byNameOnly)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new FormatException("Column name cannot be empty.");
-            if ((name[0] == 'C' || name[0] == 'c') && int.TryParse(name[1..], out int cn) && cn >= 1 && cn <= _ws.ColumnCount)
+            if (!byNameOnly && (name[0] == 'C' || name[0] == 'c') && int.TryParse(name[1..], out int cn) && cn >= 1 && cn <= _ws.ColumnCount)
                 return cn - 1;
             int byName = _ws.IndexOf(name);
             if (byName >= 0) return byName;
@@ -202,7 +249,11 @@ public static class Calculator
             if (_colCache.TryGetValue(idx, out var cached)) return cached;
             var col = _ws[idx];
             var vals = new double[_n];
-            for (int r = 0; r < _n; r++) vals[r] = !col.IsMissing(r) && DataColumn.TryParse(col[r], out var v) ? v : double.NaN;
+            for (int r = 0; r < _n; r++)
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                vals[r] = !col.IsMissing(r) && DataColumn.TryParse(col[r], out var v) ? v : double.NaN;
+            }
             _colCache[idx] = vals;
             return vals;
         }

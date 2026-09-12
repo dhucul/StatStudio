@@ -20,13 +20,13 @@ internal static class TimeSeriesTests
         Check.Close(tr.Forecasts[0], 6.0, "forecast t=6");
         Check.Close(tr.Forecasts[1], 7.0, "forecast t=7");
 
-        Check.Section("Moving average (length 3, centered)");
+        Check.Section("Moving average (length 3, trailing)");
         var ma = TimeSeries.MovingAverage(new double[] { 1, 2, 3, 4, 5 }, 3);
-        Check.Close(ma.Fitted[1], 2.0, "MA at index 1");
-        Check.Close(ma.Fitted[2], 3.0, "MA at index 2");
-        Check.Close(ma.Fitted[3], 4.0, "MA at index 3");
+        Check.True(double.IsNaN(ma.Fitted[1]), "no average before a complete trailing window");
+        Check.Close(ma.Fitted[2], 2.0, "MA at index 2");
+        Check.Close(ma.Fitted[3], 3.0, "MA at index 3");
         var wholeWindow = TimeSeries.MovingAverage(new double[] { 1, 2, 3 }, 3);
-        Check.True(double.IsFinite(wholeWindow.Fitted[1]), "MA length may equal series length");
+        Check.True(double.IsFinite(wholeWindow.Fitted[2]), "MA length may equal series length");
 
         Check.Section("Single exponential smoothing  {2,4,6}, alpha=0.5");
         var ses = TimeSeries.SingleExp(new double[] { 2, 4, 6 }, 0.5, forecasts: 1);

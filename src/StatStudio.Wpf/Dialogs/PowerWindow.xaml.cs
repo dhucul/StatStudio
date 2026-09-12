@@ -66,7 +66,7 @@ public partial class PowerWindow : Window
 
         if (SolveForPower)
         {
-            if (!TestOptions.ParseDouble(NBox.Text, out var n) || n < 2) { Warn("Enter a sample size ≥ 2."); return; }
+            if (!TestOptions.ParseDouble(NBox.Text, out var n) || n < 2 || n != Math.Truncate(n)) { Warn("Enter a whole sample size ≥ 2."); return; }
             N = n;
         }
         else

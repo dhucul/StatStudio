@@ -13,15 +13,21 @@ public static class FishersExact
         if (a < 0 || b < 0 || c < 0 || d < 0)
             throw new ArgumentOutOfRangeException(nameof(a), "Cell counts must be nonnegative.");
 
-        int r1 = a + b, r2 = c + d, c1 = a + c, n = a + b + c + d;
+        long total = (long)a + b + c + d;
+        if (total > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(a), "The total count must not exceed 2,147,483,647.");
+        int r1 = a + b, r2 = c + d, c1 = a + c, n = (int)total;
         if (n == 0)
             throw new ArgumentException("The contingency table must contain at least one observation.");
         int lo = Math.Max(0, c1 - r2), hi = Math.Min(r1, c1);
+        if ((long)hi - lo > 1_000_000)
+            throw new ArgumentException("This table requires more than 1,000,000 exact probabilities. Use a chi-square test.");
 
         double pObs = HyperProb(a, r1, r2, c1, n);
         double pTwo = 0, pLess = 0, pGreater = 0;
-        for (int x = lo; x <= hi; x++)
+        for (long value = lo; value <= hi; value++)
         {
+            int x = (int)value;
             double px = HyperProb(x, r1, r2, c1, n);
             if (px <= pObs * (1 + 1e-7)) pTwo += px;
             if (x <= a) pLess += px;

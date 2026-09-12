@@ -21,14 +21,12 @@ SetupIconFile=..\src\StatStudio.Wpf\app.ico
 ; Install machine-wide. In administrative install mode, {autopf} resolves to the system's
 ; main Program Files folder instead of the current user's {localappdata}\Programs folder.
 PrivilegesRequired=admin
-; NOTE: do not set DisableDirPage=yes here — Inno ignores the /DIR= command-line switch when the
-; directory page is disabled, and tools/e2e-install.ps1 relies on /DIR to install into an isolated
-; test folder. The [InstallDelete] section below is scoped to this installer's own payload instead,
-; so a retargeted {app} can no longer be wiped recursively.
+; Custom destinations remain available; PrepareToInstall rejects nonempty folders
+; unless they are the registered installation of this application.
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Reliable in-place upgrade: detect & close a running instance and don't auto-restart.
-CloseApplications=force
+CloseApplications=yes
 CloseApplicationsFilter=*.exe,*.dll
 RestartApplications=no
 OutputDir=..\dist
@@ -47,18 +45,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
-[InstallDelete]
-; Clear the previous build's payload so an older install is fully replaced. Scoped to what this
-; installer actually writes rather than "{app}\*", which would recursively wipe whatever {app}
-; happened to point at.
-Type: files; Name: "{app}\*.exe"
-Type: files; Name: "{app}\*.dll"
-Type: files; Name: "{app}\*.json"
-Type: files; Name: "{app}\*.pdb"
-Type: filesandordirs; Name: "{app}\runtimes"
-
 [Files]
-; The entire self-contained app (exe + .NET runtime).
+; Replace only the named payload files. Never delete by extension or directory wildcard.
 Source: "..\dist\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
@@ -68,3 +56,38 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function IsRegisteredTarget(const Target: String): Boolean;
+var
+  Previous: String;
+begin
+  Result := RegQueryStringValue(HKLM64,
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{F2A7C3D1-9B4E-4A6F-8C2D-1E5B7A9F3C04}_is1',
+    'InstallLocation', Previous);
+  if Result then
+    Result := CompareText(RemoveBackslashUnlessRoot(ExpandFileName(Previous)),
+      RemoveBackslashUnlessRoot(ExpandFileName(Target))) = 0;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Target: String;
+  Entry: TFindRec;
+begin
+  Result := '';
+  Target := ExpandConstant('{app}');
+  if IsRegisteredTarget(Target) then exit;
+  if FindFirst(AddBackslash(Target) + '*', Entry) then begin
+    try
+      repeat
+        if (Entry.Name <> '.') and (Entry.Name <> '..') then begin
+          Result := 'Choose an empty folder or the registered StatStudio installation folder. Existing unrelated files will not be overwritten.';
+          exit;
+        end;
+      until not FindNext(Entry);
+    finally
+      FindClose(Entry);
+    end;
+  end;
+end;

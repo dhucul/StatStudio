@@ -2,86 +2,90 @@ using MathNet.Numerics.Distributions;
 
 namespace StatStudio.Core.Statistics;
 
-/// <summary>
-/// Power and sample-size calculations (normal approximation, which is exact for the
-/// z-test and a close approximation for the corresponding t-tests).
-/// </summary>
+/// <summary>Normal-approximation power, with signed alternatives and integer sample-size searches.</summary>
 public static class Power
 {
-    private static double Zc(double alpha, Alternative alt)
+    private static double Critical(double alpha, Alternative alt)
     {
         StatGuard.Probability(alpha, nameof(alpha));
-        return alt == Alternative.TwoSided
-            ? Normal.InvCDF(0, 1, 1 - alpha / 2)
-            : Normal.InvCDF(0, 1, 1 - alpha);
+        if (!Enum.IsDefined(alt)) throw new ArgumentOutOfRangeException(nameof(alt));
+        return Normal.InvCDF(0, 1, 1 - alpha / (alt == Alternative.TwoSided ? 2 : 1));
     }
 
-    // ---- one-sample t (effect = |mean - mu0| / sigma) ----------------------
+    private static double RejectionProbability(double shift, double sd, double critical, Alternative alt) => alt switch
+    {
+        Alternative.Less => Normal.CDF(0, 1, (-critical - shift) / sd),
+        Alternative.Greater => Normal.CDF(0, 1, (shift - critical) / sd),
+        _ => Normal.CDF(0, 1, (-critical - shift) / sd) + Normal.CDF(0, 1, (shift - critical) / sd),
+    };
 
+    /// <param name="effect">Signed (mean - null mean) / sigma.</param>
     public static double OneSampleTPower(double n, double effect, double alpha, Alternative alt)
     {
-        RequireSampleSize(n, nameof(n));
+        RequireSampleSize(n);
         RequireEffect(effect);
-        double ncp = Math.Abs(effect) * Math.Sqrt(n);
-        double zc = Zc(alpha, alt);
-        double power = Normal.CDF(0, 1, ncp - zc);
-        if (alt == Alternative.TwoSided) power += Normal.CDF(0, 1, -ncp - zc);
-        return power;
+        return RejectionProbability(effect * Math.Sqrt(n), 1, Critical(alpha, alt), alt);
+    }
+
+    public static double TwoSampleTPower(double nPerGroup, double effect, double alpha, Alternative alt)
+    {
+        RequireSampleSize(nPerGroup);
+        RequireEffect(effect);
+        return RejectionProbability(effect * Math.Sqrt(nPerGroup / 2), 1, Critical(alpha, alt), alt);
     }
 
     public static double OneSampleTSampleSize(double power, double effect, double alpha, Alternative alt)
     {
-        StatGuard.Probability(power, nameof(power));
         RequireEffect(effect);
-        double zc = Zc(alpha, alt), zb = Normal.InvCDF(0, 1, power);
-        return Math.Pow((zc + zb) / Math.Abs(effect), 2);
-    }
-
-    // ---- two-sample t (effect = |mu1 - mu2| / sigma, equal n per group) -----
-
-    public static double TwoSampleTPower(double nPerGroup, double effect, double alpha, Alternative alt)
-    {
-        RequireSampleSize(nPerGroup, nameof(nPerGroup));
-        RequireEffect(effect);
-        double ncp = Math.Abs(effect) * Math.Sqrt(nPerGroup / 2.0);
-        double zc = Zc(alpha, alt);
-        double power = Normal.CDF(0, 1, ncp - zc);
-        if (alt == Alternative.TwoSided) power += Normal.CDF(0, 1, -ncp - zc);
-        return power;
+        return SampleSize(power, effect, alt, n => OneSampleTPower(n, effect, alpha, alt));
     }
 
     public static double TwoSampleTSampleSize(double power, double effect, double alpha, Alternative alt)
     {
-        StatGuard.Probability(power, nameof(power));
         RequireEffect(effect);
-        double zc = Zc(alpha, alt), zb = Normal.InvCDF(0, 1, power);
-        return 2 * Math.Pow((zc + zb) / Math.Abs(effect), 2);
+        return SampleSize(power, effect, alt, n => TwoSampleTPower(n, effect, alpha, alt));
     }
-
-    // ---- one proportion ----------------------------------------------------
 
     public static double OneProportionPower(double n, double p0, double p1, double alpha, Alternative alt)
     {
-        RequireSampleSize(n, nameof(n));
-        RequireDistinctProportions(p0, p1);
-        double zc = Zc(alpha, alt);
-        double se0 = Math.Sqrt(p0 * (1 - p0)), se1 = Math.Sqrt(p1 * (1 - p1));
-        return Normal.CDF(0, 1, (Math.Abs(p1 - p0) * Math.Sqrt(n) - zc * se0) / se1);
+        RequireSampleSize(n);
+        RequireProportions(p0, p1);
+        double se0 = Math.Sqrt(p0 * (1 - p0));
+        return RejectionProbability((p1 - p0) * Math.Sqrt(n) / se0,
+            Math.Sqrt(p1 * (1 - p1)) / se0, Critical(alpha, alt), alt);
     }
 
     public static double OneProportionSampleSize(double power, double p0, double p1, double alpha, Alternative alt)
     {
-        StatGuard.Probability(power, nameof(power));
-        RequireDistinctProportions(p0, p1);
-        double zc = Zc(alpha, alt), zb = Normal.InvCDF(0, 1, power);
-        double num = zc * Math.Sqrt(p0 * (1 - p0)) + zb * Math.Sqrt(p1 * (1 - p1));
-        return Math.Pow(num / (p1 - p0), 2);
+        RequireProportions(p0, p1);
+        return SampleSize(power, p1 - p0, alt, n => OneProportionPower(n, p0, p1, alpha, alt));
     }
 
-    private static void RequireSampleSize(double n, string paramName)
+    private static double SampleSize(double target, double change, Alternative alt, Func<double, double> power)
     {
-        if (!double.IsFinite(n) || n <= 0)
-            throw new ArgumentOutOfRangeException(paramName, "Sample size must be positive and finite.");
+        StatGuard.Probability(target, nameof(target));
+        if (power(2) >= target) return 2;
+        if ((alt == Alternative.Less && change > 0) || (alt == Alternative.Greater && change < 0))
+            throw new ArgumentException("The change is opposite to the selected alternative; increasing the sample size cannot achieve this power.");
+        long lo = 2, hi = 4;
+        while (power(hi) < target)
+        {
+            lo = hi;
+            if (hi == int.MaxValue) throw new ArgumentException("Required sample size exceeds 2,147,483,647.");
+            hi = Math.Min(int.MaxValue, hi * 2);
+        }
+        while (hi - lo > 1)
+        {
+            long mid = lo + (hi - lo) / 2;
+            if (power(mid) >= target) hi = mid; else lo = mid;
+        }
+        return hi;
+    }
+
+    private static void RequireSampleSize(double n)
+    {
+        if (!double.IsFinite(n) || n < 2 || n != Math.Truncate(n))
+            throw new ArgumentOutOfRangeException(nameof(n), "Sample size must be a whole number of at least 2.");
     }
 
     private static void RequireEffect(double effect)
@@ -90,11 +94,10 @@ public static class Power
             throw new ArgumentOutOfRangeException(nameof(effect), "Effect size must be finite and nonzero.");
     }
 
-    private static void RequireDistinctProportions(double p0, double p1)
+    private static void RequireProportions(double p0, double p1)
     {
         StatGuard.Probability(p0, nameof(p0));
         StatGuard.Probability(p1, nameof(p1));
-        if (p0 == p1)
-            throw new ArgumentException("The null and alternative proportions must differ.");
+        if (p0 == p1) throw new ArgumentException("The null and alternative proportions must differ.");
     }
 }

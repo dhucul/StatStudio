@@ -87,7 +87,7 @@ public partial class TimeSeriesWindow : Window
         }
         if (ForecastRow.Visibility == Visibility.Visible)
         {
-            if (!TestOptions.ParseInt(ForecastBox.Text, out var f) || f < 0) { Warn("Forecast count must be nonnegative."); return; }
+            if (!TestOptions.ParseInt(ForecastBox.Text, out var f) || f < 0 || f > 10000) { Warn("Forecast count must be between 0 and 10000."); return; }
             Forecasts = f;
         }
         DialogResult = true;

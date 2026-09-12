@@ -21,8 +21,9 @@ public static class TimeSeries
 {
     // ---- autocorrelation ---------------------------------------------------
 
-    public static AcfResult Autocorrelation(double[] y, int maxLag)
+    public static AcfResult Autocorrelation(double[] y, int maxLag, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 1);
         if (maxLag < 0) throw new ArgumentOutOfRangeException(nameof(maxLag));
         int n = y.Length;
@@ -34,6 +35,7 @@ public static class TimeSeries
         acf[0] = 1.0;
         for (int k = 1; k <= maxLag; k++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double num = 0;
             for (int t = 0; t < n - k; t++) num += (y[t] - mean) * (y[t + k] - mean);
             acf[k] = denom > 0 ? num / denom : double.NaN;
@@ -48,6 +50,7 @@ public static class TimeSeries
         if (maxLag >= 1) { pacf[1] = acf[1]; previous[1] = acf[1]; }
         for (int k = 2; k <= maxLag; k++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double num = acf[k];
             for (int j = 1; j < k; j++) num -= previous[j] * acf[k - j];
             double den = 1.0;
@@ -63,8 +66,9 @@ public static class TimeSeries
 
     // ---- trend -------------------------------------------------------------
 
-    public static TrendResult LinearTrend(double[] y, int forecasts = 0)
+    public static TrendResult LinearTrend(double[] y, int forecasts = 0, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 3);
         RequireForecasts(forecasts);
         int n = y.Length;
@@ -76,8 +80,9 @@ public static class TimeSeries
             Accuracy(y, reg.Fitted), $"Y = {Round(b0)} + {Round(b1)}·t");
     }
 
-    public static TrendResult QuadraticTrend(double[] y, int forecasts = 0)
+    public static TrendResult QuadraticTrend(double[] y, int forecasts = 0, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 4);
         RequireForecasts(forecasts);
         int n = y.Length;
@@ -91,8 +96,9 @@ public static class TimeSeries
 
     // ---- moving average ----------------------------------------------------
 
-    public static SmoothingResult MovingAverage(double[] y, int length, int forecasts = 0)
+    public static SmoothingResult MovingAverage(double[] y, int length, int forecasts = 0, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 1);
         if (length < 1 || length > y.Length)
             throw new ArgumentOutOfRangeException(nameof(length), "Length must be between 1 and the series length.");
@@ -100,12 +106,12 @@ public static class TimeSeries
         int n = y.Length;
         var fitted = new double[n];
         Array.Fill(fitted, double.NaN);
-        bool center = length % 2 == 1;
-        int half = length / 2;
+        // A trailing window for every length; parity must not change time alignment.
         for (int i = 0; i < n; i++)
         {
-            int lo = center ? i - half : i - length + 1;
-            int hi = center ? i + half : i;
+            cancellationToken.ThrowIfCancellationRequested();
+            int lo = i - length + 1;
+            int hi = i;
             if (lo < 0 || hi >= n) continue;
             double sum = 0;
             for (int j = lo; j <= hi; j++) sum += y[j];
@@ -113,14 +119,15 @@ public static class TimeSeries
         }
         double last = y.Skip(Math.Max(0, n - length)).Average();
         var fc = Enumerable.Repeat(last, forecasts).ToArray();
-        return new SmoothingResult("Moving Average", new[] { ("Length", (double)length) },
+        return new SmoothingResult("Moving Average (trailing)", new[] { ("Length", (double)length) },
             fitted, fc, Accuracy(y, fitted));
     }
 
     // ---- exponential smoothing --------------------------------------------
 
-    public static SmoothingResult SingleExp(double[] y, double alpha, int forecasts = 0)
+    public static SmoothingResult SingleExp(double[] y, double alpha, int forecasts = 0, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 1);
         StatGuard.UnitInterval(alpha, nameof(alpha));
         RequireForecasts(forecasts);
@@ -130,6 +137,7 @@ public static class TimeSeries
         double level = y[0];
         for (int t = 1; t < n; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             fitted[t] = level;                      // one-step-ahead forecast
             level = alpha * y[t] + (1 - alpha) * level;
         }
@@ -138,8 +146,9 @@ public static class TimeSeries
             fitted, fc, Accuracy(y, fitted));
     }
 
-    public static SmoothingResult DoubleExp(double[] y, double alpha, double beta, int forecasts = 0)
+    public static SmoothingResult DoubleExp(double[] y, double alpha, double beta, int forecasts = 0, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 2);
         StatGuard.UnitInterval(alpha, nameof(alpha));
         StatGuard.UnitInterval(beta, nameof(beta));
@@ -148,9 +157,10 @@ public static class TimeSeries
         var fitted = new double[n];
         Array.Fill(fitted, double.NaN);
         double level = y[0];
-        double trend = n > 1 ? y[1] - y[0] : 0;
+        double trend = y[1] - y[0];
         for (int t = 1; t < n; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             fitted[t] = level + trend;
             double prev = level;
             level = alpha * y[t] + (1 - alpha) * (level + trend);
@@ -162,8 +172,9 @@ public static class TimeSeries
     }
 
     public static SmoothingResult Winters(double[] y, int period, double alpha, double beta, double gamma,
-        bool multiplicative, int forecasts = 0)
+        bool multiplicative, int forecasts = 0, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 1);
         if (period < 2) throw new ArgumentOutOfRangeException(nameof(period));
         StatGuard.UnitInterval(alpha, nameof(alpha));
@@ -173,7 +184,7 @@ public static class TimeSeries
         if (multiplicative && y.Any(v => v <= 0))
             throw new ArgumentException("Multiplicative Winters requires positive observations.", nameof(y));
         int n = y.Length;
-        if (n < 2 * period) throw new ArgumentException("Winters needs at least two full seasons of data.");
+        if (period > n / 2) throw new ArgumentException("Winters needs at least two full seasons of data.");
 
         double level = y.Take(period).Average();
         double level2 = y.Skip(period).Take(period).Average();
@@ -186,6 +197,7 @@ public static class TimeSeries
         Array.Fill(fitted, double.NaN);
         for (int t = period; t < n; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double s = seasonal[t - period];
             fitted[t] = multiplicative ? (level + trend) * s : level + trend + s;
             double prev = level;
@@ -205,6 +217,7 @@ public static class TimeSeries
         var fc = new double[forecasts];
         for (int h = 1; h <= forecasts; h++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double s = seasonal[n - period + ((h - 1) % period)];
             fc[h - 1] = multiplicative ? (level + h * trend) * s : level + h * trend + s;
         }
@@ -215,11 +228,12 @@ public static class TimeSeries
 
     // ---- decomposition -----------------------------------------------------
 
-    public static DecompositionResult Decompose(double[] y, int period, bool multiplicative)
+    public static DecompositionResult Decompose(double[] y, int period, bool multiplicative, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSeries(y, 1);
         if (period < 2) throw new ArgumentOutOfRangeException(nameof(period));
-        if (y.Length < 2 * period)
+        if (period > y.Length / 2)
             throw new ArgumentException("Decomposition needs at least two full seasons.", nameof(y));
         if (multiplicative && y.Any(v => v <= 0))
             throw new ArgumentException("Multiplicative decomposition requires positive observations.", nameof(y));
@@ -229,6 +243,7 @@ public static class TimeSeries
         int half = period / 2;
         for (int t = 0; t < n; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (t - half < 0 || t + half >= n) continue;
             double sum;
             if (period % 2 == 0)
@@ -253,6 +268,7 @@ public static class TimeSeries
         var idx = new double[period];
         for (int s = 0; s < period; s++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var vals = new List<double>();
             for (int t = s; t < n; t += period) if (!double.IsNaN(detrended[t])) vals.Add(detrended[t]);
             idx[s] = vals.Count > 0 ? vals.Average() : (multiplicative ? 1 : 0);
@@ -296,7 +312,8 @@ public static class TimeSeries
 
     private static void RequireForecasts(int forecasts)
     {
-        if (forecasts < 0) throw new ArgumentOutOfRangeException(nameof(forecasts));
+        if (forecasts < 0 || forecasts > AnalysisLimits.MaxForecasts)
+            throw new ArgumentOutOfRangeException(nameof(forecasts), "Forecast count must be between 0 and 10000.");
     }
 
     private static string Round(double v) => v.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);

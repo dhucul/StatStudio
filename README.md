@@ -54,8 +54,24 @@ StatStudio.slnx
   installer/            StatStudio.iss, build-installer.ps1
 ```
 
-The Core worksheet is the single source of truth for analyses; the WPF grid edits a `DataTable`
-that is converted to a Core `Worksheet` whenever an analysis runs.
+The editable `DataTable` is the live worksheet; analyses use a detached Core `Worksheet`
+snapshot after committing edits. Declared column types survive this conversion. Numeric results
+are stored at full precision and rounded only for display. Column-header sorting is disabled so
+the visible worksheet, ordered analyses, and exports keep the same observation order.
+
+Imports let you choose whether the first row contains column names. For a CSV exported by
+StatStudio, select the export option to decode its reversible formula guards; leave it off for
+external CSVs to preserve literal apostrophes. XLSX uses text/quote-prefix metadata instead.
+Use `.ssproj` to preserve declared text identifiers such as `00123` and other column types.
+
+Time-series, I-MR, and capability inputs reject missing observations before the final value;
+trailing empty worksheet padding is ignored. Moving averages use trailing windows for both odd
+and even lengths. Power calculations honor signed alternatives and return whole sample sizes.
+
+Heavy analyses and file operations run in the background with a Cancel operation button.
+Numerical loops check cancellation; third-party file/matrix calls finish their current call
+before cancellation can be observed. Limits are 10,000 forecasts/design runs, 512 worksheet
+columns, 2,000,000 worksheet cells, and 64 MB per imported file.
 
 ## Build / run / test
 

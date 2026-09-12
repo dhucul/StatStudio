@@ -40,6 +40,13 @@ public sealed class DataColumn
 
     public void Add(string? raw) => _cells.Add(Clean(raw));
 
+    /// <summary>Store numeric results without applying display rounding.</summary>
+    public void AddNumber(double value)
+    {
+        if (double.IsInfinity(value)) throw new ArithmeticException("Cannot store an infinite numeric result.");
+        Add(double.IsNaN(value) ? null : value.ToString("R", CultureInfo.InvariantCulture));
+    }
+
     public void Set(int row, string? raw)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(row);
@@ -66,6 +73,19 @@ public sealed class DataColumn
             if (TryParse(_cells[i], out var v)) list.Add(v);
         }
         return list.ToArray();
+    }
+
+    /// <summary>Equally spaced observations; trailing worksheet padding is ignored,
+    /// but gaps are rejected so subsequent periods are never silently renumbered.</summary>
+    public double[] SeriesValues()
+    {
+        int last = Count - 1;
+        while (last >= 0 && IsMissing(last)) last--;
+        var values = new double[last + 1];
+        for (int i = 0; i <= last; i++)
+            if (IsMissing(i) || !TryParse(this[i], out values[i]))
+                throw new ArgumentException($"'{Name}' has a missing or nonnumeric observation in row {i + 1}. Fill the gap before running an ordered analysis.");
+        return values;
     }
 
     /// <summary>Non-missing cell text (used for categorical / grouping columns).</summary>

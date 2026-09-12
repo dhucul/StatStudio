@@ -70,8 +70,8 @@ public static class ControlCharts
     {
         RequirePairedCounts(defectives, sizes, defectivesCannotExceedSize: true);
         int k = defectives.Length;
-        double totalD = defectives.Sum();
-        double totalN = sizes.Sum();
+        double totalD = defectives.Sum(v => (double)v);
+        double totalN = sizes.Sum(v => (double)v);
         double pbar = totalD / totalN;
 
         var p = new double[k];
@@ -116,7 +116,7 @@ public static class ControlCharts
     {
         RequirePairedCounts(counts, sizes, defectivesCannotExceedSize: false);
         int k = counts.Length;
-        double ubar = (double)counts.Sum() / sizes.Sum();
+        double ubar = counts.Sum(v => (double)v) / sizes.Sum(v => (double)v);
         var u = new double[k];
         var ucl = new double[k];
         var lcl = new double[k];

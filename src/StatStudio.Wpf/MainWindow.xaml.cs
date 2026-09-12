@@ -37,29 +37,37 @@ public partial class MainWindow : Window
             var a = args[i].ToLowerInvariant();
             switch (a)
             {
-                case "--demo": var ws = BuildDemo(); RunDescriptives(ws, ws.NumericColumns().Select(c => c.Name));
+                case "--demo":
+                    var ws = BuildDemo(); RunDescriptives(ws, ws.NumericColumns().Select(c => c.Name));
                     DemoGraphs(ws); break;
-                case "--shot-descriptives": BuildDemo(); var cw = CurrentWorksheet();
+                case "--shot-descriptives":
+                    BuildDemo(); var cw = CurrentWorksheet();
                     RunDescriptives(cw, cw.NumericColumns().Select(c => c.Name)); break;
                 case "--shot-histogram": var w2 = BuildDemo(); ShowGraph("Histogram of Height", p => Plots.Histogram(p, "Height", w2.Find("Height")!.NumericValues())); break;
-                case "--shot-boxplot": var w3 = BuildDemo(); ShowGraph("Boxplot", p => Plots.Boxplot(p,
+                case "--shot-boxplot":
+                    var w3 = BuildDemo(); ShowGraph("Boxplot", p => Plots.Boxplot(p,
                     new[] { ("Height", w3.Find("Height")!.NumericValues()), ("Weight", w3.Find("Weight")!.NumericValues()) })); break;
-                case "--shot-scatter": var w4 = BuildDemo(); var (sx, sy) = Columns.Pairwise(w4.Find("Height")!, w4.Find("Weight")!);
+                case "--shot-scatter":
+                    var w4 = BuildDemo(); var (sx, sy) = Columns.Pairwise(w4.Find("Height")!, w4.Find("Weight")!);
                     ShowGraph("Scatterplot of Weight vs Height", p => Plots.Scatter(p, "Height", "Weight", sx, sy)); break;
                 case "--shot-probplot": var w5 = BuildDemo(); ShowGraph("Probability Plot of Height", p => Plots.ProbabilityPlot(p, "Height", w5.Find("Height")!.NumericValues())); break;
-                case "--shot-ttest": var w6 = BuildDemo(); var hv = w6.Find("Height")!.NumericValues();
+                case "--shot-ttest":
+                    var w6 = BuildDemo(); var hv = w6.Find("Height")!.NumericValues();
                     OutputRaw(HypothesisFormatters.OneSampleT(HypothesisTests.OneSampleT(hv, 170, 0.95, Alternative.TwoSided), "Height", 170)); break;
-                case "--shot-regression": var wr = BuildDemo();
+                case "--shot-regression":
+                    var wr = BuildDemo();
                     var (rx, ry) = Columns.Pairwise(wr.Find("Height")!, wr.Find("Weight")!);
                     var rr = Regression.SimpleLinear(rx, ry, "Height", "Weight");
                     OutputRaw(RegressionFormatter.Format(rr));
                     ShowGraph("Fitted Line Plot of Weight vs Height",
                         p => Plots.FittedLine(p, "Height", "Weight", rx, ry, rr.Coefficients[0], rr.Coefficients[1])); break;
-                case "--shot-imr": var wi = BuildDemo(); var iv = wi.Find("Height")!.NumericValues();
+                case "--shot-imr":
+                    var wi = BuildDemo(); var iv = wi.Find("Height")!.NumericValues();
                     var (ic, mrc) = ControlCharts.IMR(iv);
                     OutputRaw(SpcFormatter.Pair("I-MR Chart", ic, mrc));
                     ShowGraph(ic.Title, p => Plots.ControlChart(p, ic)); break;
-                case "--shot-capability": var wc = BuildDemo(); var cv = wc.Find("Height")!.NumericValues();
+                case "--shot-capability":
+                    var wc = BuildDemo(); var cv = wc.Find("Height")!.NumericValues();
                     var cap = Capability.FromIndividuals(cv, 150, 190, 170);
                     OutputRaw(SpcFormatter.Capability(cap));
                     ShowGraph("Process Capability of Height",
@@ -70,7 +78,8 @@ public partial class MainWindow : Window
                     break;
                 case "--shot-dlg":
                     new Dialogs.ColumnPickerWindow("DialogProbe", "Variables (numeric):",
-                        new[] { "Height", "Weight", "Group" }) { Owner = this }.Show();
+                        new[] { "Height", "Weight", "Group" })
+                    { Owner = this }.Show();
                     break;
                 case "--shot-bayes":
                     OutputRaw(BayesFormatters.Proportion(Bayes.Proportion(8, 10, 1, 1), "Sample"));
@@ -131,12 +140,13 @@ public partial class MainWindow : Window
                     for (int q = 0; q < 8; q++) dY[q] = 10 + 3 * dA[q] + 2 * dB[q] + 1 * dA[q] * dB[q] + dnz[q];
                     var dr = FactorialAnalysis.Analyze(dY, new[] { dA, dB }, new[] { "A", "B" }, "Y");
                     OutputRaw(DoeFormatters.Factorial(dr));
-                    var de = dr.Terms.Where(t => t.Name != "Constant")
+                    var de = dr.Terms.Where(t => double.IsFinite(t.Effect))
                         .OrderByDescending(t => Math.Abs(double.IsNaN(t.T) ? t.Effect : t.T)).ToList();
                     ShowGraph("Pareto of Effects", p => Plots.LabeledBars(p, "Pareto of Effects", "Term", "|Standardized effect|",
                         de.Select(t => t.Name).ToList(), de.Select(t => Math.Abs(double.IsNaN(t.T) ? t.Effect : t.T)).ToList()));
                     break;
-                case "--shot-pca": var wp = BuildDemo();
+                case "--shot-pca":
+                    var wp = BuildDemo();
                     var pcaCols = new[] { wp.Find("Height")!, wp.Find("Weight")! };
                     var pcaRows = Columns.Rows(pcaCols).ToArray();
                     var pcaR = Pca.Compute(pcaRows, new[] { "Height", "Weight" }, true);
@@ -157,7 +167,8 @@ public partial class MainWindow : Window
                     OutputRaw(TimeSeriesFormatters.Acf(TimeSeries.Autocorrelation(sales, 12), "Sales", false));
                     ShowGraph("Trend Analysis of Sales", p => Plots.TimeSeriesFit(p, "Sales", sales, tr.Fitted, tr.Forecasts));
                     break;
-                case "--shot-tukey": var wtk = BuildAnovaDemo();
+                case "--shot-tukey":
+                    var wtk = BuildAnovaDemo();
                     var tkGroups = new (string, double[])[]
                     {
                         ("Method A", wtk.Find("Method A")!.NumericValues()),
@@ -169,7 +180,8 @@ public partial class MainWindow : Window
                     var lx = Enumerable.Repeat(0.0, 10).Concat(Enumerable.Repeat(1.0, 10)).ToArray();
                     var ly = new double[] { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0 };
                     OutputRaw(AdvancedFormatters.Logistic(Logistic.Fit(ly, new[] { lx }, new[] { "x" }, "y"))); break;
-                case "--shot-correlation": var wco = BuildAnovaDemo();
+                case "--shot-correlation":
+                    var wco = BuildAnovaDemo();
                     OutputRaw(NonparametricFormatters.Correlation(Correlation.Matrix(
                         new[] { wco.Find("Method A")!, wco.Find("Method B")!, wco.Find("Method C")! }, false)));
                     OutputRaw(NonparametricFormatters.KruskalWallis(Nonparametric.KruskalWallis(new (string, double[])[]
@@ -178,7 +190,8 @@ public partial class MainWindow : Window
                         ("Method B", wco.Find("Method B")!.NumericValues()),
                         ("Method C", wco.Find("Method C")!.NumericValues()),
                     }), "Yield", "Method")); break;
-                case "--shot-anova": var wa = BuildAnovaDemo();
+                case "--shot-anova":
+                    var wa = BuildAnovaDemo();
                     OutputRaw(AnovaFormatter.OneWay(Anova.OneWay(new (string, double[])[]
                     {
                         ("Method A", wa.Find("Method A")!.NumericValues()),
@@ -303,8 +316,23 @@ public partial class MainWindow : Window
         UpdateDims(snapshot);
     }
 
-    private void OnTableChanged(object? sender, DataColumnChangeEventArgs e) => MarkDirty();
-    private void OnTableRowChanged(object? sender, DataRowChangeEventArgs e) => MarkDirty();
+    private void OnTableChanged(object? sender, DataColumnChangeEventArgs e) { MarkDirty(); QueueWorksheetRefresh(); }
+    private void OnTableRowChanged(object? sender, DataRowChangeEventArgs e) { MarkDirty(); QueueWorksheetRefresh(); }
+    private bool _refreshPending;
+
+    private void QueueWorksheetRefresh()
+    {
+        if (_refreshPending || _closed) return;
+        _refreshPending = true;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+        {
+            _refreshPending = false;
+            if (_closed) return;
+            var snapshot = WorksheetGrid.ToWorksheet(_table);
+            RefreshNavigator(snapshot);
+            UpdateDims(snapshot);
+        }));
+    }
 
     private void MarkDirty()
     {
@@ -338,18 +366,36 @@ public partial class MainWindow : Window
         if (!ConfirmDiscardChanges()) { e.Cancel = true; return; }
         // A model fit can outlive the window; signal it so its continuation stops before
         // touching torn-down controls.
-        _fitCancellation?.Cancel();
+        _closed = true;
+        _work.Cancel();
     }
 
-    /// <summary>Cancellation for the one long-running model fit that may be in flight.</summary>
-    private CancellationTokenSource? _fitCancellation;
+    private readonly BackgroundWork _work = new();
+    private bool _closed;
 
-    private CancellationTokenSource StartFit()
+    private void OnCancelWork(object sender, RoutedEventArgs e)
     {
-        _fitCancellation?.Cancel();
-        var cts = new CancellationTokenSource();
-        _fitCancellation = cts;
-        return cts;
+        _work.Cancel();
+        if (_work.IsRunning)
+        {
+            CancelWorkButton.IsEnabled = false;
+            StatusText.Text = "Cancelling…";
+        }
+    }
+
+    private async Task<T> RunWorkAsync<T>(Func<CancellationToken, T> calculate, bool discardCancelledResult = true)
+    {
+        var result = await _work.RunAsync(calculate, busy =>
+        {
+            if (_closed) return;
+            MainMenu.IsEnabled = !busy;
+            Sheet.IsEnabled = !busy;
+            CancelWorkButton.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+            CancelWorkButton.IsEnabled = busy;
+            StatusText.Text = busy ? "Working…" : "Ready";
+        }, discardCancelledResult);
+        if (_closed) throw new OperationCanceledException();
+        return result;
     }
 
     /// <summary>Current grid contents as a Core worksheet (commits any in-progress edit first).</summary>
@@ -366,7 +412,7 @@ public partial class MainWindow : Window
         foreach (var c in ws.Columns)
         {
             int n = c.Count - c.MissingCount();
-            NavList.Items.Add($"   {c.Name}  ({(c.LooksNumeric() ? "num" : "text")}, n={n})");
+            NavList.Items.Add($"   {c.Name}  ({(c.Type == CoreData.ColumnType.Numeric && c.LooksNumeric() ? "num" : c.Type == CoreData.ColumnType.DateTime ? "date" : "text")}, n={n})");
         }
     }
 
@@ -387,6 +433,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void Append(string block)
     {
+        if (_closed) return;
         Session.AppendText(block);
         if (Session.Text.Length > SessionCharacterCap)
             Session.Text = Session.Text[^(SessionCharacterCap / 2)..];
@@ -412,12 +459,11 @@ public partial class MainWindow : Window
 
     private void ShowError(string title, Exception ex)
     {
+        if (_closed) return;
+        if (ex is OperationCanceledException) { Log(title + ": cancelled."); return; }
         Log($"ERROR — {title}: {ex.Message}");
         MessageBox.Show(ex.Message, title, MessageBoxButton.OK, MessageBoxImage.Error);
     }
-
-    private void NotYet(string feature) =>
-        Log($"[{feature}] is not implemented yet — coming in a later phase.");
 
     // ---- analysis helpers --------------------------------------------------
 
@@ -460,7 +506,7 @@ public partial class MainWindow : Window
         if (ConfirmDiscardChanges()) NewWorksheet();
     }
 
-    private void OnOpenCsv(object sender, RoutedEventArgs e)
+    private async void OnOpenCsv(object sender, RoutedEventArgs e)
     {
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
@@ -468,21 +514,27 @@ public partial class MainWindow : Window
             Title = "Open data",
         };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.FileName };
+        string fileName = selection.FileName;
+        bool excel = fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
+        var options = new ImportOptionsWindow(excel) { Owner = this };
+        if (options.ShowDialog() != true) return;
+        bool hasHeader = options.HasHeader, decodeGuards = options.DecodeFormulaGuards;
         // Ask before reading: a large workbook takes real time, and discarding it afterwards
         // means the user waited for a file that was never going to be loaded.
         if (!ConfirmDiscardChanges()) return;
         try
         {
-            var ws = dlg.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)
-                ? CoreData.WorksheetIo.ReadXlsx(dlg.FileName)
-                : CoreData.WorksheetIo.ReadCsv(dlg.FileName);
+            var ws = await RunWorkAsync(ct => excel
+                ? CoreData.WorksheetIo.ReadXlsx(fileName, hasHeader, ct)
+                : CoreData.WorksheetIo.ReadCsv(fileName, hasHeader, decodeGuards, ct));
             LoadWorksheet(ws);
-            Log($"Opened '{System.IO.Path.GetFileName(dlg.FileName)}' — {ws.ColumnCount} columns, {ws.RowCount} rows.");
+            Log($"Opened '{System.IO.Path.GetFileName(selection.FileName)}' — {ws.ColumnCount} columns, {ws.RowCount} rows.");
         }
         catch (Exception ex) { ShowError("Open failed", ex); }
     }
 
-    private void OnSaveCsv(object sender, RoutedEventArgs e)
+    private async void OnSaveCsv(object sender, RoutedEventArgs e)
     {
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
@@ -491,21 +543,27 @@ public partial class MainWindow : Window
             Title = "Save worksheet",
         };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.FileName };
         try
         {
             var ws = CurrentWorksheet();
-            if (dlg.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
-                CoreData.WorksheetIo.WriteXlsx(ws, dlg.FileName);
-            else
-                CoreData.WorksheetIo.WriteCsv(ws, dlg.FileName,
-                    dlg.FileName.EndsWith(".tsv", StringComparison.OrdinalIgnoreCase) ? '\t' : ',');
+            string fileName = selection.FileName;
+            await RunWorkAsync(ct =>
+            {
+                if (fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+                    CoreData.WorksheetIo.WriteXlsx(ws, fileName, ct);
+                else
+                    CoreData.WorksheetIo.WriteCsv(ws, fileName,
+                        fileName.EndsWith(".tsv", StringComparison.OrdinalIgnoreCase) ? '\t' : ',', ct);
+                return true;
+            }, discardCancelledResult: false);
             MarkClean();
-            Log($"Saved worksheet to '{System.IO.Path.GetFileName(dlg.FileName)}'.");
+            Log($"Saved worksheet to '{System.IO.Path.GetFileName(selection.FileName)}'.");
         }
         catch (Exception ex) { ShowError("Save failed", ex); }
     }
 
-    private void OnOpenProject(object sender, RoutedEventArgs e)
+    private async void OnOpenProject(object sender, RoutedEventArgs e)
     {
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
@@ -513,17 +571,19 @@ public partial class MainWindow : Window
             Title = "Open project",
         };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.FileName };
         if (!ConfirmDiscardChanges()) return;
         try
         {
-            var ws = CoreData.ProjectStore.Load(dlg.FileName);
+            string fileName = selection.FileName;
+            var ws = await RunWorkAsync(ct => CoreData.ProjectStore.Load(fileName, ct));
             LoadWorksheet(ws);
-            Log($"Opened project '{System.IO.Path.GetFileName(dlg.FileName)}'.");
+            Log($"Opened project '{System.IO.Path.GetFileName(selection.FileName)}'.");
         }
         catch (Exception ex) { ShowError("Open project failed", ex); }
     }
 
-    private void OnSaveProject(object sender, RoutedEventArgs e)
+    private async void OnSaveProject(object sender, RoutedEventArgs e)
     {
         var dlg = new Microsoft.Win32.SaveFileDialog
         {
@@ -532,11 +592,14 @@ public partial class MainWindow : Window
             Title = "Save project",
         };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.FileName };
         try
         {
-            CoreData.ProjectStore.Save(CurrentWorksheet(), dlg.FileName);
+            var snapshot = CurrentWorksheet();
+            string fileName = selection.FileName;
+            await RunWorkAsync(ct => { CoreData.ProjectStore.Save(snapshot, fileName, ct); return true; }, discardCancelledResult: false);
             MarkClean();
-            Log($"Saved project to '{System.IO.Path.GetFileName(dlg.FileName)}'.");
+            Log($"Saved project to '{System.IO.Path.GetFileName(selection.FileName)}'.");
         }
         catch (Exception ex) { ShowError("Save project failed", ex); }
     }
@@ -550,10 +613,12 @@ public partial class MainWindow : Window
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Display Descriptive Statistics",
-            "Variables (numeric):", numeric) { Owner = this };
+            "Variables (numeric):", numeric)
+        { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.SelectedColumns };
 
-        RunDescriptives(ws, dlg.SelectedColumns);
+        RunDescriptives(ws, selection.SelectedColumns);
     }
 
     private void RunDescriptives(CoreData.Worksheet ws, IEnumerable<string> cols)
@@ -567,12 +632,13 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new OneSampleTWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        foreach (var n in dlg.SelectedColumns)
+        var selection = new { dlg.Alt, dlg.Confidence, dlg.Mu0, dlg.SelectedColumns };
+        foreach (var n in selection.SelectedColumns)
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length < 2) { Log($"{n}: need at least 2 values."); continue; }
-            var r = HypothesisTests.OneSampleT(v, dlg.Mu0, dlg.Confidence, dlg.Alt);
-            OutputRaw(HypothesisFormatters.OneSampleT(r, n, dlg.Mu0));
+            var r = HypothesisTests.OneSampleT(v, selection.Mu0, selection.Confidence, selection.Alt);
+            OutputRaw(HypothesisFormatters.OneSampleT(r, n, selection.Mu0));
         }
     }
 
@@ -582,13 +648,14 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new TwoColumnWindow(numeric, "2-Sample t", showPooled: true) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var x1 = ws.Find(dlg.Column1)!.NumericValues();
-        var x2 = ws.Find(dlg.Column2)!.NumericValues();
+        var selection = new { dlg.Alt, dlg.Column1, dlg.Column2, dlg.Confidence, dlg.Pooled };
+        var x1 = ws.Find(selection.Column1)!.NumericValues();
+        var x2 = ws.Find(selection.Column2)!.NumericValues();
         if (x1.Length < 2 || x2.Length < 2) { Log("Each sample needs at least 2 values."); return; }
         try
         {
-            var r = HypothesisTests.TwoSampleT(x1, x2, dlg.Pooled, dlg.Confidence, dlg.Alt);
-            OutputRaw(HypothesisFormatters.TwoSampleT(r, dlg.Column1, dlg.Column2));
+            var r = HypothesisTests.TwoSampleT(x1, x2, selection.Pooled, selection.Confidence, selection.Alt);
+            OutputRaw(HypothesisFormatters.TwoSampleT(r, selection.Column1, selection.Column2));
         }
         catch (Exception ex) { Log($"2-Sample t: {ex.Message}"); }
     }
@@ -599,25 +666,28 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new TwoColumnWindow(numeric, "Paired t", showPooled: false) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var (x1, x2) = Columns.Pairwise(ws.Find(dlg.Column1)!, ws.Find(dlg.Column2)!);
+        var selection = new { dlg.Alt, dlg.Column1, dlg.Column2, dlg.Confidence };
+        var (x1, x2) = Columns.Pairwise(ws.Find(selection.Column1)!, ws.Find(selection.Column2)!);
         if (x1.Length < 2) { Log("Need at least 2 paired (row-matched) observations."); return; }
-        var r = HypothesisTests.PairedT(x1, x2, dlg.Confidence, dlg.Alt);
-        OutputRaw(HypothesisFormatters.PairedT(r, dlg.Column1, dlg.Column2));
+        var r = HypothesisTests.PairedT(x1, x2, selection.Confidence, selection.Alt);
+        OutputRaw(HypothesisFormatters.PairedT(r, selection.Column1, selection.Column2));
     }
 
     private void OnOneProportion(object sender, RoutedEventArgs e)
     {
         var dlg = new ProportionWindow(two: false) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var r = HypothesisTests.OneProportion(dlg.Events1, dlg.Trials1, dlg.P0, dlg.Confidence, dlg.Alt);
-        OutputRaw(HypothesisFormatters.OneProportion(r, "Sample", dlg.P0));
+        var selection = new { dlg.Alt, dlg.Confidence, dlg.Events1, dlg.P0, dlg.Trials1 };
+        var r = HypothesisTests.OneProportion(selection.Events1, selection.Trials1, selection.P0, selection.Confidence, selection.Alt);
+        OutputRaw(HypothesisFormatters.OneProportion(r, "Sample", selection.P0));
     }
 
     private void OnTwoProportions(object sender, RoutedEventArgs e)
     {
         var dlg = new ProportionWindow(two: true) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var r = HypothesisTests.TwoProportions(dlg.Events1, dlg.Trials1, dlg.Events2, dlg.Trials2, dlg.Confidence, dlg.Alt);
+        var selection = new { dlg.Alt, dlg.Confidence, dlg.Events1, dlg.Events2, dlg.Trials1, dlg.Trials2 };
+        var r = HypothesisTests.TwoProportions(selection.Events1, selection.Trials1, selection.Events2, selection.Trials2, selection.Confidence, selection.Alt);
         OutputRaw(HypothesisFormatters.TwoProportions(r, "Sample 1", "Sample 2"));
     }
 
@@ -626,9 +696,11 @@ public partial class MainWindow : Window
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Chi-Square Goodness-of-Fit",
-            "Column(s) of observed counts (one test each):", numeric) { Owner = this };
+            "Column(s) of observed counts (one test each):", numeric)
+        { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        foreach (var n in dlg.SelectedColumns)
+        var selection = new { dlg.SelectedColumns };
+        foreach (var n in selection.SelectedColumns)
         {
             var obs = ws.Find(n)!.NumericValues();
             if (obs.Length < 2) { Log($"{n}: need at least 2 categories."); continue; }
@@ -647,10 +719,12 @@ public partial class MainWindow : Window
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Cross Tabulation & Chi-Square",
-            "Columns forming the table (each column = a table column):", numeric) { Owner = this };
+            "Columns forming the table (each column = a table column):", numeric)
+        { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.SelectedColumns };
 
-        var selected = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var selected = selection.SelectedColumns.Select(n => ws.Find(n)!).ToList();
         var completeRows = Columns.Rows(selected);
         int rows = completeRows.Count;
         if (rows < 2) { Log("Need at least 2 rows of counts."); return; }
@@ -662,263 +736,282 @@ public partial class MainWindow : Window
         {
             var r = HypothesisTests.ChiSquareAssociation(table);
             var rowLabels = Enumerable.Range(1, rows).Select(i => $"R{i}").ToList();
-            OutputRaw(HypothesisFormatters.Contingency(r, rowLabels, dlg.SelectedColumns));
+            OutputRaw(HypothesisFormatters.Contingency(r, rowLabels, selection.SelectedColumns));
         }
         catch (Exception ex) { Log($"Chi-square association: {ex.Message}"); }
     }
 
-    private void OnOneWayAnova(object sender, RoutedEventArgs e)
+    private async void OnOneWayAnova(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow("One-Way ANOVA",
-            "Response columns (each column is a group):", numeric) { Owner = this };
+            "Response columns (each column is a group):", numeric)
+        { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var groups = dlg.SelectedColumns
+        var selection = new { dlg.SelectedColumns };
+        var groups = selection.SelectedColumns
             .Select(n => (n, ws.Find(n)!.NumericValues()))
             .Where(t => t.Item2.Length > 0).ToList();
         if (groups.Count < 2) { Log("Need at least 2 non-empty groups."); return; }
-        var r = Anova.OneWay(groups);
+        var r = await RunWorkAsync(ct => Anova.OneWay(groups));
         OutputRaw(AnovaFormatter.OneWay(r, "Factor", "Response"));
-        try { OutputRaw(AdvancedFormatters.Tukey(AnovaExtensions.Tukey(groups))); }
+        try { OutputRaw(AdvancedFormatters.Tukey(await RunWorkAsync(ct => AnovaExtensions.Tukey(groups, cancellationToken: ct)))); }
         catch (Exception ex) { Log($"Tukey: {ex.Message}"); }
     }
 
-    private void OnTwoWayAnova(object sender, RoutedEventArgs e)
+    private async void OnTwoWayAnova(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var all = ws.Columns.Select(c => c.Name).ToList();
         var dlg = new TwoWayAnovaWindow(numeric, all) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var (y, a, b) = Columns.Factorial(ws.Find(dlg.Response)!, ws.Find(dlg.FactorA)!, ws.Find(dlg.FactorB)!);
+        var selection = new { dlg.FactorA, dlg.FactorB, dlg.Response };
+        var (y, a, b) = Columns.Factorial(ws.Find(selection.Response)!, ws.Find(selection.FactorA)!, ws.Find(selection.FactorB)!);
         if (y.Length < 4) { Log("Not enough complete rows."); return; }
-        try { OutputRaw(AdvancedFormatters.TwoWayAnova(AnovaExtensions.TwoWay(y, a, b, dlg.FactorA, dlg.FactorB), dlg.Response)); }
+        try { OutputRaw(AdvancedFormatters.TwoWayAnova(await RunWorkAsync(ct => AnovaExtensions.TwoWay(y, a, b, selection.FactorA, selection.FactorB)), selection.Response)); }
         catch (Exception ex) { Log($"Two-way ANOVA: {ex.Message}"); }
     }
 
-    private void OnEqualVariances(object sender, RoutedEventArgs e)
+    private async void OnEqualVariances(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Test for Equal Variances", "Group columns:", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var groups = dlg.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
+        var selection = new { dlg.SelectedColumns };
+        var groups = selection.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
             .Where(t => t.Item2.Length > 1).ToList();
         if (groups.Count < 2) { Log("Need at least 2 groups with >1 value."); return; }
-        try { OutputRaw(AdvancedFormatters.EqualVariances(VarianceTests.EqualVariances(groups), "Response", "Factor")); }
+        try { OutputRaw(AdvancedFormatters.EqualVariances(await RunWorkAsync(ct => VarianceTests.EqualVariances(groups)), "Response", "Factor")); }
         catch (Exception ex) { Log($"Equal variances: {ex.Message}"); }
     }
 
-    private void OnTwoVariances(object sender, RoutedEventArgs e)
+    private async void OnTwoVariances(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
-        var dlg = new TwoColumnWindow(numeric, "2 Variances (F-Test)", showPooled: false) { Owner = this };
+        var dlg = new TwoColumnWindow(numeric, "2 Variances (F-Test)", showPooled: false, twoSidedOnly: true) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var x1 = ws.Find(dlg.Column1)!.NumericValues();
-        var x2 = ws.Find(dlg.Column2)!.NumericValues();
+        var selection = new { dlg.Column1, dlg.Column2, dlg.Confidence };
+        var x1 = ws.Find(selection.Column1)!.NumericValues();
+        var x2 = ws.Find(selection.Column2)!.NumericValues();
         if (x1.Length < 2 || x2.Length < 2) { Log("Each sample needs at least 2 values."); return; }
         // Throws when either column is constant — an ordinary selection, not a programming error.
-        try { OutputRaw(AdvancedFormatters.FTest(VarianceTests.FTest(x1, x2, dlg.Confidence), dlg.Column1, dlg.Column2)); }
+        try { OutputRaw(AdvancedFormatters.FTest(await RunWorkAsync(ct => VarianceTests.FTest(x1, x2, selection.Confidence)), selection.Column1, selection.Column2)); }
         catch (Exception ex) { Log($"2 Variances: {ex.Message}"); }
     }
 
-    private void OnPolynomialRegression(object sender, RoutedEventArgs e)
+    private async void OnPolynomialRegression(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new PolynomialWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var (xs, ys) = Columns.Pairwise(ws.Find(dlg.XColumn)!, ws.Find(dlg.YColumn)!);
-        if (xs.Length <= dlg.Degree + 1) { Log("Not enough points for that degree."); return; }
+        var selection = new { dlg.Degree, dlg.XColumn, dlg.YColumn };
+        var (xs, ys) = Columns.Pairwise(ws.Find(selection.XColumn)!, ws.Find(selection.YColumn)!);
+        if (xs.Length <= selection.Degree + 1) { Log("Not enough points for that degree."); return; }
         try
         {
-            var r = RegressionExtensions.Polynomial(xs, ys, dlg.Degree, dlg.XColumn, dlg.YColumn);
+            var r = await RunWorkAsync(ct => RegressionExtensions.Polynomial(xs, ys, selection.Degree, selection.XColumn, selection.YColumn, cancellationToken: ct));
             OutputRaw(RegressionFormatter.Format(r));
             ShowGraph("Residuals vs Fitted", p => Plots.ResidualVsFitted(p, r.Fitted, r.Residuals));
         }
         catch (Exception ex) { Log($"Polynomial regression: {ex.Message}"); }
     }
 
-    private void OnBestSubsets(object sender, RoutedEventArgs e)
+    private async void OnBestSubsets(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Best Subsets Regression" };
         if (dlg.ShowDialog() != true) return;
-        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
-        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
-        try { OutputRaw(AdvancedFormatters.BestSubsets(RegressionExtensions.BestSubsets(y, x, dlg.Predictors))); }
+        var selection = new { dlg.Predictors, dlg.Response };
+        var (y, x) = Columns.Design(ws.Find(selection.Response)!, selection.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= selection.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(AdvancedFormatters.BestSubsets(await RunWorkAsync(ct => RegressionExtensions.BestSubsets(y, x, selection.Predictors, cancellationToken: ct)))); }
         catch (Exception ex) { Log($"Best subsets: {ex.Message}"); }
     }
 
-    private void OnStepwise(object sender, RoutedEventArgs e)
+    private async void OnStepwise(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Stepwise Regression" };
         if (dlg.ShowDialog() != true) return;
-        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
-        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
-        try { OutputRaw(AdvancedFormatters.Stepwise(RegressionExtensions.Stepwise(y, x, dlg.Predictors))); }
+        var selection = new { dlg.Predictors, dlg.Response };
+        var (y, x) = Columns.Design(ws.Find(selection.Response)!, selection.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= selection.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(AdvancedFormatters.Stepwise(await RunWorkAsync(ct => RegressionExtensions.Stepwise(y, x, selection.Predictors, cancellationToken: ct)))); }
         catch (Exception ex) { Log($"Stepwise: {ex.Message}"); }
     }
 
-    private void OnLogistic(object sender, RoutedEventArgs e)
+    private async void OnLogistic(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Binary Logistic Regression" };
         if (dlg.ShowDialog() != true) return;
-        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
-        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
-        try { OutputRaw(AdvancedFormatters.Logistic(Logistic.Fit(y, x, dlg.Predictors, dlg.Response))); }
+        var selection = new { dlg.Predictors, dlg.Response };
+        var (y, x) = Columns.Design(ws.Find(selection.Response)!, selection.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= selection.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(AdvancedFormatters.Logistic(await RunWorkAsync(ct => Logistic.Fit(y, x, selection.Predictors, selection.Response)))); }
         catch (Exception ex) { Log($"Logistic regression: {ex.Message} (response must be coded 0/1)"); }
     }
 
     // ---- Multivariate & power ---------------------------------------------
 
-    private void OnFishersExact(object sender, RoutedEventArgs e)
+    private async void OnFishersExact(object sender, RoutedEventArgs e)
     {
         var dlg = new FisherWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.CellA, dlg.CellB, dlg.CellC, dlg.CellD };
         // An all-zero table is accepted by the dialog but has no observations to test.
-        try { OutputRaw(MultivariateFormatters.Fisher(FishersExact.Test(dlg.CellA, dlg.CellB, dlg.CellC, dlg.CellD))); }
+        try { OutputRaw(MultivariateFormatters.Fisher(await RunWorkAsync(ct => FishersExact.Test(selection.CellA, selection.CellB, selection.CellC, selection.CellD)))); }
         catch (Exception ex) { Log($"Fisher's exact test: {ex.Message}"); }
     }
 
-    private void OnPca(object sender, RoutedEventArgs e)
+    private async void OnPca(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Principal Components", "Variables (2 or more):", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var selection = new { dlg.SelectedColumns };
+        var cols = selection.SelectedColumns.Select(n => ws.Find(n)!).ToList();
         if (cols.Count < 2) { Log("Select at least two variables."); return; }
         var rows = Columns.Rows(cols);
         if (rows.Count < 2) { Log("Not enough complete rows."); return; }
         try
         {
-            var r = Pca.Compute(rows.ToArray(), dlg.SelectedColumns, correlation: true);
+            var r = await RunWorkAsync(ct => Pca.Compute(rows.ToArray(), selection.SelectedColumns, correlation: true));
             OutputRaw(MultivariateFormatters.Pca(r));
             ShowGraph("Scree Plot", p => Plots.Scree(p, r.Eigenvalues));
         }
         catch (Exception ex) { Log($"PCA: {ex.Message}"); }
     }
 
-    private void OnKMeans(object sender, RoutedEventArgs e)
+    private async void OnKMeans(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new KMeansWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var selection = new { dlg.K, dlg.SelectedColumns };
+        var cols = selection.SelectedColumns.Select(n => ws.Find(n)!).ToList();
         var rows = Columns.Rows(cols);
-        if (rows.Count < dlg.K) { Log("Need at least k complete rows."); return; }
+        if (rows.Count < selection.K) { Log("Need at least k complete rows."); return; }
         try
         {
-            var r = KMeans.Cluster(rows.ToArray(), dlg.K, dlg.SelectedColumns);
+            var r = await RunWorkAsync(ct => KMeans.Cluster(rows.ToArray(), selection.K, selection.SelectedColumns, cancellationToken: ct));
             OutputRaw(MultivariateFormatters.KMeans(r));
-            if (dlg.SelectedColumns.Count == 2)
+            if (selection.SelectedColumns.Count == 2)
                 ShowGraph("K-Means Clusters",
-                    p => Plots.ClusterScatter(p, dlg.SelectedColumns[0], dlg.SelectedColumns[1], rows.ToArray(), r.Assignments, r.K));
+                    p => Plots.ClusterScatter(p, selection.SelectedColumns[0], selection.SelectedColumns[1], rows.ToArray(), r.Assignments, r.K));
         }
         catch (Exception ex) { Log($"K-Means: {ex.Message}"); }
     }
 
     // ---- Bayesian & mixed --------------------------------------------------
 
-    private void OnBayesProportion(object sender, RoutedEventArgs e)
+    private async void OnBayesProportion(object sender, RoutedEventArgs e)
     {
         var dlg = new BayesProportionWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.Confidence, dlg.N, dlg.PriorA, dlg.PriorB, dlg.Threshold, dlg.X };
         try
         {
-            var r = Bayes.Proportion(dlg.X, dlg.N, dlg.PriorA, dlg.PriorB, dlg.Confidence, dlg.Threshold);
+            var r = await RunWorkAsync(ct => Bayes.Proportion(selection.X, selection.N, selection.PriorA, selection.PriorB, selection.Confidence, selection.Threshold));
             OutputRaw(BayesFormatters.Proportion(r, "Sample"));
         }
         catch (Exception ex) { Log($"Bayesian proportion: {ex.Message}"); }
     }
 
-    private void OnBayesNormal(object sender, RoutedEventArgs e)
+    private async void OnBayesNormal(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new BayesNormalWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var v = ws.Find(dlg.DataColumn)!.NumericValues();
+        var selection = new { dlg.Confidence, dlg.DataColumn, dlg.KnownSigma, dlg.KnownVariance, dlg.PriorMean, dlg.PriorSd, dlg.Threshold };
+        var v = ws.Find(selection.DataColumn)!.NumericValues();
         if (v.Length < 2) { Log("Need at least 2 values."); return; }
         // The Jeffreys-prior path requires variation in the sample.
         try
         {
-            var r = dlg.KnownVariance
-                ? Bayes.NormalMeanKnownVar(v, dlg.PriorMean, dlg.PriorSd, dlg.KnownSigma, dlg.Confidence, dlg.Threshold)
-                : Bayes.NormalMeanUnknownVar(v, dlg.Confidence, dlg.Threshold);
-            OutputRaw(BayesFormatters.NormalMean(r, dlg.DataColumn));
+            var r = selection.KnownVariance
+                ? await RunWorkAsync(ct => Bayes.NormalMeanKnownVar(v, selection.PriorMean, selection.PriorSd, selection.KnownSigma, selection.Confidence, selection.Threshold))
+                : await RunWorkAsync(ct => Bayes.NormalMeanUnknownVar(v, selection.Confidence, selection.Threshold));
+            OutputRaw(BayesFormatters.NormalMean(r, selection.DataColumn));
         }
         catch (Exception ex) { Log($"Bayesian normal mean: {ex.Message}"); }
     }
 
-    private void OnBayesRegression(object sender, RoutedEventArgs e)
+    private async void OnBayesRegression(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Bayesian Linear Regression" };
         if (dlg.ShowDialog() != true) return;
-        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
-        if (y.Length <= dlg.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
-        try { OutputRaw(BayesFormatters.Regression(Bayes.LinearRegression(y, x, dlg.Predictors, dlg.Response))); }
+        var selection = new { dlg.Predictors, dlg.Response };
+        var (y, x) = Columns.Design(ws.Find(selection.Response)!, selection.Predictors.Select(n => ws.Find(n)!).ToList());
+        if (y.Length <= selection.Predictors.Count + 1) { Log("Not enough complete rows."); return; }
+        try { OutputRaw(BayesFormatters.Regression(await RunWorkAsync(ct => Bayes.LinearRegression(y, x, selection.Predictors, selection.Response)))); }
         catch (Exception ex) { Log($"Bayesian regression: {ex.Message}"); }
     }
 
-    private void OnOneWayRandom(object sender, RoutedEventArgs e)
+    private async void OnOneWayRandom(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow("One-Way Random Effects",
-            "Group columns (each column is a random-effect level):", numeric) { Owner = this };
+            "Group columns (each column is a random-effect level):", numeric)
+        { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var groups = dlg.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
+        var selection = new { dlg.SelectedColumns };
+        var groups = selection.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
             .Where(t => t.Item2.Length > 0).ToList();
         if (groups.Count < 2) { Log("Need at least 2 groups."); return; }
-        try { OutputRaw(MixedFormatters.OneWayRandom(MixedModel.OneWayRandom(groups), "Response", "Group")); }
+        try { OutputRaw(MixedFormatters.OneWayRandom(await RunWorkAsync(ct => MixedModel.OneWayRandom(groups)), "Response", "Group")); }
         catch (Exception ex) { Log($"Random-effects model: {ex.Message}"); }
     }
 
-    private void OnFactorAnalysis(object sender, RoutedEventArgs e)
+    private async void OnFactorAnalysis(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new FactorWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var selection = new { dlg.NumFactors, dlg.SelectedColumns, dlg.Varimax };
+        var cols = selection.SelectedColumns.Select(n => ws.Find(n)!).ToList();
         var rows = Columns.Rows(cols);
         if (rows.Count < 2) { Log("Not enough complete rows."); return; }
         try
         {
-            var r = FactorAnalysis.Extract(rows.ToArray(), dlg.SelectedColumns, dlg.NumFactors, dlg.Varimax);
+            var r = await RunWorkAsync(ct => FactorAnalysis.Extract(rows.ToArray(), selection.SelectedColumns, selection.NumFactors, selection.Varimax));
             OutputRaw(MultivariateFormatters.FactorAnalysis(r));
         }
         catch (Exception ex) { Log($"Factor analysis: {ex.Message}"); }
     }
 
-    private void OnDistFit(object sender, RoutedEventArgs e)
+    private async void OnDistFit(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new DistFitWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.CensorColumn, dlg.Distribution, dlg.TimesColumn };
         double[] t;
         bool[]? censored = null;
-        if (dlg.CensorColumn is null)
+        if (selection.CensorColumn is null)
         {
-            t = ws.Find(dlg.TimesColumn)!.NumericValues();
+            t = ws.Find(selection.TimesColumn)!.NumericValues();
         }
         else
         {
             // Row-aligned so a missing cell in either column drops the whole observation.
-            var (times, flags) = Columns.Pairwise(ws.Find(dlg.TimesColumn)!, ws.Find(dlg.CensorColumn)!);
+            var (times, flags) = Columns.Pairwise(ws.Find(selection.TimesColumn)!, ws.Find(selection.CensorColumn)!);
             if (flags.Any(v => v != 0 && v != 1))
             { Log("Censoring indicators must be exactly 0 (failure) or 1 (right-censored)."); return; }
             t = times;
@@ -927,45 +1020,46 @@ public partial class MainWindow : Window
 
         if (t.Length < 3) { Log("Need at least 3 observations."); return; }
         if (t.Any(v => v <= 0))
-        { Log($"{dlg.Distribution} requires all times > 0."); return; }
+        { Log($"{selection.Distribution} requires all times > 0."); return; }
         try
         {
-            var fit = dlg.Distribution switch
+            var fit = selection.Distribution switch
             {
-                "Exponential" => Reliability.FitExponential(t, censored),
-                "Lognormal" => Reliability.FitLognormal(t, censored),
-                "Normal" => Reliability.FitNormal(t, censored),
-                _ => Reliability.FitWeibull(t, censored),
+                "Exponential" => await RunWorkAsync(ct => Reliability.FitExponential(t, censored, cancellationToken: ct)),
+                "Lognormal" => await RunWorkAsync(ct => Reliability.FitLognormal(t, censored, cancellationToken: ct)),
+                "Normal" => await RunWorkAsync(ct => Reliability.FitNormal(t, censored, cancellationToken: ct)),
+                _ => await RunWorkAsync(ct => Reliability.FitWeibull(t, censored, cancellationToken: ct)),
             };
-            OutputRaw(ReliabilityFormatters.DistributionFit(fit, dlg.TimesColumn));
-            if (dlg.Distribution == "Weibull")
+            OutputRaw(ReliabilityFormatters.DistributionFit(fit, selection.TimesColumn));
+            if (selection.Distribution == "Weibull")
             {
                 double beta = fit.Parameters[0].Value, eta = fit.Parameters[1].Value;
-                ShowGraph($"Weibull Plot of {dlg.TimesColumn}",
-                    p => Plots.WeibullPlot(p, dlg.TimesColumn, t, beta, eta, censored));
+                ShowGraph($"Weibull Plot of {selection.TimesColumn}",
+                    p => Plots.WeibullPlot(p, selection.TimesColumn, t, beta, eta, censored));
             }
-            else ShowGraph($"Histogram of {dlg.TimesColumn}", p => Plots.Histogram(p, dlg.TimesColumn, t));
+            else ShowGraph($"Histogram of {selection.TimesColumn}", p => Plots.Histogram(p, selection.TimesColumn, t));
         }
         catch (Exception ex) { Log($"Distribution analysis: {ex.Message}"); }
     }
 
-    private void OnKaplanMeier(object sender, RoutedEventArgs e)
+    private async void OnKaplanMeier(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new KaplanMeierWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.CensorColumn, dlg.TimesColumn };
 
         double[] times;
         bool[] censored;
-        if (dlg.CensorColumn is null)
+        if (selection.CensorColumn is null)
         {
-            times = ws.Find(dlg.TimesColumn)!.NumericValues();
+            times = ws.Find(selection.TimesColumn)!.NumericValues();
             censored = new bool[times.Length];
         }
         else
         {
-            var (tv, cv) = Columns.Pairwise(ws.Find(dlg.TimesColumn)!, ws.Find(dlg.CensorColumn)!);
+            var (tv, cv) = Columns.Pairwise(ws.Find(selection.TimesColumn)!, ws.Find(selection.CensorColumn)!);
             times = tv;
             if (cv.Any(v => v != 0 && v != 1))
             {
@@ -978,10 +1072,10 @@ public partial class MainWindow : Window
         if (times.Any(t => t < 0)) { Log("Survival times must be nonnegative."); return; }
         try
         {
-            var km = Reliability.KaplanMeier(times, censored);
-            OutputRaw(ReliabilityFormatters.KaplanMeier(km, dlg.TimesColumn));
-            ShowGraph($"Kaplan-Meier Survival of {dlg.TimesColumn}",
-                p => Plots.StepSurvival(p, dlg.TimesColumn, km.Rows.Select(r => r.Time).ToArray(),
+            var km = await RunWorkAsync(ct => Reliability.KaplanMeier(times, censored, cancellationToken: ct));
+            OutputRaw(ReliabilityFormatters.KaplanMeier(km, selection.TimesColumn));
+            ShowGraph($"Kaplan-Meier Survival of {selection.TimesColumn}",
+                p => Plots.StepSurvival(p, selection.TimesColumn, km.Rows.Select(r => r.Time).ToArray(),
                     km.Rows.Select(r => r.Survival).ToArray()));
         }
         catch (Exception ex) { Log($"Kaplan-Meier: {ex.Message}"); }
@@ -991,37 +1085,38 @@ public partial class MainWindow : Window
     {
         var dlg = new PowerWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.Alpha, dlg.Alt, dlg.EffectSize, dlg.N, dlg.P0, dlg.P1, dlg.SolveForPower, dlg.TargetPower, dlg.TestIndex };
 
-        string test = dlg.TestIndex switch { 1 => "2-Sample t", 2 => "1 Proportion", _ => "1-Sample t" };
-        string solveFor = dlg.SolveForPower ? "power" : "sample size";
+        string test = selection.TestIndex switch { 1 => "2-Sample t", 2 => "1 Proportion", _ => "1-Sample t" };
+        string solveFor = selection.SolveForPower ? "power" : "sample size";
         double n, power, effectVal;
         string effectDesc;
 
-        if (dlg.TestIndex == 2)
+        if (selection.TestIndex == 2)
         {
-            effectDesc = $"p0 = {dlg.P0}, p1 = {dlg.P1}";
-            if (dlg.SolveForPower) { n = dlg.N; power = Power.OneProportionPower(n, dlg.P0, dlg.P1, dlg.Alpha, dlg.Alt); }
-            else { power = dlg.TargetPower; n = Power.OneProportionSampleSize(power, dlg.P0, dlg.P1, dlg.Alpha, dlg.Alt); }
+            effectDesc = $"p0 = {selection.P0}, p1 = {selection.P1}";
+            if (selection.SolveForPower) { n = selection.N; power = Power.OneProportionPower(n, selection.P0, selection.P1, selection.Alpha, selection.Alt); }
+            else { power = selection.TargetPower; n = Power.OneProportionSampleSize(power, selection.P0, selection.P1, selection.Alpha, selection.Alt); }
         }
         else
         {
-            effectVal = dlg.EffectSize;
+            effectVal = selection.EffectSize;
             effectDesc = $"d = {effectVal}";
-            bool two = dlg.TestIndex == 1;
-            if (dlg.SolveForPower)
+            bool two = selection.TestIndex == 1;
+            if (selection.SolveForPower)
             {
-                n = dlg.N;
-                power = two ? Power.TwoSampleTPower(n, effectVal, dlg.Alpha, dlg.Alt)
-                            : Power.OneSampleTPower(n, effectVal, dlg.Alpha, dlg.Alt);
+                n = selection.N;
+                power = two ? Power.TwoSampleTPower(n, effectVal, selection.Alpha, selection.Alt)
+                            : Power.OneSampleTPower(n, effectVal, selection.Alpha, selection.Alt);
             }
             else
             {
-                power = dlg.TargetPower;
-                n = two ? Power.TwoSampleTSampleSize(power, effectVal, dlg.Alpha, dlg.Alt)
-                        : Power.OneSampleTSampleSize(power, effectVal, dlg.Alpha, dlg.Alt);
+                power = selection.TargetPower;
+                n = two ? Power.TwoSampleTSampleSize(power, effectVal, selection.Alpha, selection.Alt)
+                        : Power.OneSampleTSampleSize(power, effectVal, selection.Alpha, selection.Alt);
             }
         }
-        OutputRaw(MultivariateFormatters.Power(test, solveFor, dlg.Alpha, dlg.Alt, effectDesc, n, power));
+        OutputRaw(MultivariateFormatters.Power(test, solveFor, selection.Alpha, selection.Alt, effectDesc, n, power));
     }
 
     // ---- DOE & Gage R&R ----------------------------------------------------
@@ -1030,11 +1125,12 @@ public partial class MainWindow : Window
     {
         var dlg = new DoeCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.CenterPoints, dlg.Factors, dlg.Randomize, dlg.Replicates };
         if (!ConfirmDiscardChanges()) return;
-        var design = DoeDesign.FullFactorial(dlg.Factors, dlg.Replicates, dlg.CenterPoints, dlg.Randomize);
+        var design = DoeDesign.FullFactorial(selection.Factors, selection.Replicates, selection.CenterPoints, selection.Randomize);
         var inv = System.Globalization.CultureInfo.InvariantCulture;
 
-        var ws = new CoreData.Worksheet { Name = $"FactorialDesign_{dlg.Factors}f" };
+        var ws = new CoreData.Worksheet { Name = $"FactorialDesign_{selection.Factors}f" };
         var so = ws.AddColumn("StdOrder");
         var ro = ws.AddColumn("RunOrder");
         var cp = ws.AddColumn("CenterPt");
@@ -1054,11 +1150,12 @@ public partial class MainWindow : Window
     {
         var dlg = new FractionalCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.Factors, dlg.Randomize, dlg.Runs };
         if (!ConfirmDiscardChanges()) return;
-        var design = DoeDesign.FractionalFactorial(dlg.Factors, dlg.Runs, dlg.Randomize);
+        var design = DoeDesign.FractionalFactorial(selection.Factors, selection.Runs, selection.Randomize);
         var inv = System.Globalization.CultureInfo.InvariantCulture;
 
-        var ws = new CoreData.Worksheet { Name = $"FracFactorial_{dlg.Factors}f{dlg.Runs}r" };
+        var ws = new CoreData.Worksheet { Name = $"FracFactorial_{selection.Factors}f{selection.Runs}r" };
         var so = ws.AddColumn("StdOrder");
         var ro = ws.AddColumn("RunOrder");
         var fcols = design.FactorNames.Select(fn => ws.AddColumn(fn)).ToList();
@@ -1072,20 +1169,17 @@ public partial class MainWindow : Window
         Log(DoeFormatters.Fractional(design));
     }
 
-    private void OnCalculator(object sender, RoutedEventArgs e)
+    private async void OnCalculator(object sender, RoutedEventArgs e)
     {
         var dlg = new CalculatorWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.Expression, dlg.TargetColumn };
         var ws = CurrentWorksheet();
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
         try
         {
-            var result = CoreData.Calculator.Evaluate(dlg.Expression, ws);
-            var col = ws.Find(dlg.TargetColumn) ?? ws.AddColumn(dlg.TargetColumn);
-            col.Clear();
-            foreach (var v in result) col.Add(double.IsNaN(v) ? null : v.ToString("0.##########", inv));
+            var rowCount = await RunWorkAsync(ct => CoreData.Calculator.EvaluateIntoColumn(selection.Expression, ws, selection.TargetColumn, ct));
             LoadWorksheet(ws, markDirty: true);
-            Log($"Calculated '{dlg.TargetColumn}' = {dlg.Expression}  ({result.Length} rows).");
+            Log($"Calculated '{selection.TargetColumn}' = {selection.Expression}  ({rowCount} rows).");
         }
         catch (Exception ex) { ShowError("Calculator", ex); }
     }
@@ -1094,13 +1188,13 @@ public partial class MainWindow : Window
     {
         var dlg = new MixtureCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.Components, dlg.Degree, dlg.IsLattice, dlg.Randomize };
         if (!ConfirmDiscardChanges()) return;
-        var design = dlg.IsLattice
-            ? MixtureDesign.SimplexLattice(dlg.Components, dlg.Degree, dlg.Randomize)
-            : MixtureDesign.SimplexCentroid(dlg.Components, dlg.Randomize);
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var design = selection.IsLattice
+            ? MixtureDesign.SimplexLattice(selection.Components, selection.Degree, selection.Randomize)
+            : MixtureDesign.SimplexCentroid(selection.Components, selection.Randomize);
 
-        var ws = new CoreData.Worksheet { Name = $"Mixture_{dlg.Components}c" };
+        var ws = new CoreData.Worksheet { Name = $"Mixture_{selection.Components}c" };
         var so = ws.AddColumn("StdOrder");
         var ro = ws.AddColumn("RunOrder");
         var pt = ws.AddColumn("PtType", CoreData.ColumnType.Text);
@@ -1110,26 +1204,27 @@ public partial class MainWindow : Window
             so.Add(run.StdOrder.ToString());
             ro.Add(run.RunOrder.ToString());
             pt.Add(run.PointType);
-            for (int j = 0; j < ccols.Count; j++) ccols[j].Add(run.Components[j].ToString("0.#####", inv));
+            for (int j = 0; j < ccols.Count; j++) ccols[j].AddNumber(run.Components[j]);
         }
         LoadWorksheet(ws, markDirty: true);
         Log(DoeFormatters.Mixture(design));
     }
 
-    private void OnAnalyzeMixture(object sender, RoutedEventArgs e)
+    private async void OnAnalyzeMixture(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Analyze Mixture Design (response, then components)" };
         if (dlg.ShowDialog() != true) return;
-        var (y, comps) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        var selection = new { dlg.Predictors, dlg.Response };
+        var (y, comps) = Columns.Design(ws.Find(selection.Response)!, selection.Predictors.Select(n => ws.Find(n)!).ToList());
         if (comps.Length < 2) { Log("Select at least two components."); return; }
         try
         {
             // The quadratic Scheffé model needs a run per cross-product term; a simplex-lattice
             // {q,1} design cannot support it, so fall back to the linear model rather than failing.
             int quadraticTerms = comps.Length + comps.Length * (comps.Length - 1) / 2;
-            var r = MixtureAnalysis.Fit(y, comps, dlg.Predictors, quadratic: y.Length > quadraticTerms);
+            var r = await RunWorkAsync(ct => MixtureAnalysis.Fit(y, comps, selection.Predictors, quadratic: y.Length > quadraticTerms));
             OutputRaw(DoeFormatters.MixtureModel(r));
         }
         catch (Exception ex) { Log($"Mixture analysis: {ex.Message}"); }
@@ -1139,13 +1234,13 @@ public partial class MainWindow : Window
     {
         var dlg = new RsmCreateWindow { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.CenterPoints, dlg.FaceCentered, dlg.Factors, dlg.IsBoxBehnken, dlg.Randomize };
         if (!ConfirmDiscardChanges()) return;
-        var design = dlg.IsBoxBehnken
-            ? ResponseSurface.BoxBehnken(dlg.Factors, dlg.CenterPoints, dlg.Randomize)
-            : ResponseSurface.CentralComposite(dlg.Factors, dlg.CenterPoints, dlg.FaceCentered, dlg.Randomize);
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var design = selection.IsBoxBehnken
+            ? ResponseSurface.BoxBehnken(selection.Factors, selection.CenterPoints, selection.Randomize)
+            : ResponseSurface.CentralComposite(selection.Factors, selection.CenterPoints, selection.FaceCentered, selection.Randomize);
 
-        var ws = new CoreData.Worksheet { Name = dlg.IsBoxBehnken ? $"BoxBehnken_{dlg.Factors}f" : $"CCD_{dlg.Factors}f" };
+        var ws = new CoreData.Worksheet { Name = selection.IsBoxBehnken ? $"BoxBehnken_{selection.Factors}f" : $"CCD_{selection.Factors}f" };
         var so = ws.AddColumn("StdOrder");
         var ro = ws.AddColumn("RunOrder");
         var pt = ws.AddColumn("PtType", CoreData.ColumnType.Text);
@@ -1155,44 +1250,46 @@ public partial class MainWindow : Window
             so.Add(run.StdOrder.ToString());
             ro.Add(run.RunOrder.ToString());
             pt.Add(run.PointType);
-            for (int j = 0; j < fcols.Count; j++) fcols[j].Add(run.Factors[j].ToString("0.#####", inv));
+            for (int j = 0; j < fcols.Count; j++) fcols[j].AddNumber(run.Factors[j]);
         }
         LoadWorksheet(ws, markDirty: true);
         Log(DoeFormatters.Rsm(design));
     }
 
-    private void OnAnalyzeRsm(object sender, RoutedEventArgs e)
+    private async void OnAnalyzeRsm(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Analyze Response Surface (quadratic)" };
         if (dlg.ShowDialog() != true) return;
-        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        var selection = new { dlg.Predictors, dlg.Response };
+        var (y, x) = Columns.Design(ws.Find(selection.Response)!, selection.Predictors.Select(n => ws.Find(n)!).ToList());
         if (x.Length < 2) { Log("Select at least two factors."); return; }
         int terms = 1 + 2 * x.Length + x.Length * (x.Length - 1) / 2;
         if (y.Length <= terms) { Log($"Need more than {terms} complete runs for a quadratic model in {x.Length} factors."); return; }
         try
         {
-            var r = ResponseSurface.Analyze(y, x, dlg.Predictors, dlg.Response);
+            var r = await RunWorkAsync(ct => ResponseSurface.Analyze(y, x, selection.Predictors, selection.Response));
             OutputRaw("Response Surface Regression (full quadratic model)\n\n" + RegressionFormatter.Format(r));
             ShowGraph("Residuals vs Fitted", p => Plots.ResidualVsFitted(p, r.Fitted, r.Residuals));
         }
         catch (Exception ex) { Log($"Response surface: {ex.Message}"); }
     }
 
-    private void OnAnalyzeFactorial(object sender, RoutedEventArgs e)
+    private async void OnAnalyzeFactorial(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this, Title = "Analyze Factorial Design" };
         if (dlg.ShowDialog() != true) return;
-        var (y, x) = Columns.Design(ws.Find(dlg.Response)!, dlg.Predictors.Select(n => ws.Find(n)!).ToList());
+        var selection = new { dlg.Predictors, dlg.Response };
+        var (y, x) = Columns.Design(ws.Find(selection.Response)!, selection.Predictors.Select(n => ws.Find(n)!).ToList());
         if (y.Length < 4) { Log("Need at least 4 complete runs."); return; }
         try
         {
-            var r = FactorialAnalysis.Analyze(y, x, dlg.Predictors, dlg.Response);
+            var r = await RunWorkAsync(ct => FactorialAnalysis.Analyze(y, x, selection.Predictors, selection.Response, cancellationToken: ct));
             OutputRaw(DoeFormatters.Factorial(r));
-            var effects = r.Terms.Where(t => t.Name != "Constant")
+            var effects = r.Terms.Where(t => double.IsFinite(t.Effect))
                 .OrderByDescending(t => Math.Abs(double.IsNaN(t.T) ? t.Effect : t.T)).ToList();
             string yl = r.DfError > 0 ? "|Standardized effect|" : "|Effect|";
             ShowGraph("Pareto of Effects", p => Plots.LabeledBars(p, "Pareto of Effects", "Term", yl,
@@ -1202,17 +1299,18 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log($"Factorial analysis: {ex.Message}"); }
     }
 
-    private void OnGageRR(object sender, RoutedEventArgs e)
+    private async void OnGageRR(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var all = ws.Columns.Select(c => c.Name).ToList();
         var dlg = new TwoWayAnovaWindow(numeric, all) { Owner = this, Title = "Gage R&R (Crossed) — Response, Part, Operator" };
         if (dlg.ShowDialog() != true) return;
-        var (y, part, op) = Columns.Factorial(ws.Find(dlg.Response)!, ws.Find(dlg.FactorA)!, ws.Find(dlg.FactorB)!);
+        var selection = new { dlg.FactorA, dlg.FactorB, dlg.Response };
+        var (y, part, op) = Columns.Factorial(ws.Find(selection.Response)!, ws.Find(selection.FactorA)!, ws.Find(selection.FactorB)!);
         try
         {
-            var g = GageRR.Analyze(y, part, op);
+            var g = await RunWorkAsync(ct => GageRR.Analyze(y, part, op));
             OutputRaw(DoeFormatters.GageRR(g));
             var comps = g.Components.Where(c => c.Source.Trim() != "Total Variation").ToList();
             ShowGraph("Gage R&R Components", p => Plots.LabeledBars(p, "Gage R&R — % Study Var", "Source", "% Study Var",
@@ -1231,18 +1329,20 @@ public partial class MainWindow : Window
         dlg = new TimeSeriesWindow(numeric, title, fields) { Owner = this };
         if (dlg.ShowDialog() != true) return null;
         name = dlg.SeriesColumn;
-        return ws.Find(name)!.NumericValues();
+        try { return ws.Find(name)!.SeriesValues(); }
+        catch (ArgumentException ex) { Log(ex.Message); return null; }
     }
 
-    private void OnTrendAnalysis(object sender, RoutedEventArgs e)
+    private async void OnTrendAnalysis(object sender, RoutedEventArgs e)
     {
         var v = OpenSeries("Trend Analysis", TsFields.TrendType | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
-        int minimum = dlg.Quadratic ? 4 : 3;
+        var selection = new { dlg.Forecasts, dlg.Quadratic };
+        int minimum = selection.Quadratic ? 4 : 3;
         if (v.Length < minimum) { Log($"Need at least {minimum} points."); return; }
         try
         {
-            var r = dlg.Quadratic ? TimeSeries.QuadraticTrend(v, dlg.Forecasts) : TimeSeries.LinearTrend(v, dlg.Forecasts);
+            var r = selection.Quadratic ? await RunWorkAsync(ct => TimeSeries.QuadraticTrend(v, selection.Forecasts, cancellationToken: ct)) : await RunWorkAsync(ct => TimeSeries.LinearTrend(v, selection.Forecasts, cancellationToken: ct));
             OutputRaw(TimeSeriesFormatters.Trend(r, name, v.Length));
             ShowGraph($"Trend Analysis of {name}",
                 p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Trend Analysis of {name}"));
@@ -1250,14 +1350,15 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log($"Trend analysis: {ex.Message}"); }
     }
 
-    private void OnMovingAverage(object sender, RoutedEventArgs e)
+    private async void OnMovingAverage(object sender, RoutedEventArgs e)
     {
         var v = OpenSeries("Moving Average", TsFields.Length | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
-        if (v.Length < dlg.Length) { Log("Series shorter than the MA length."); return; }
+        var selection = new { dlg.Forecasts, dlg.Length };
+        if (v.Length < selection.Length) { Log("Series shorter than the MA length."); return; }
         try
         {
-            var r = TimeSeries.MovingAverage(v, dlg.Length, dlg.Forecasts);
+            var r = await RunWorkAsync(ct => TimeSeries.MovingAverage(v, selection.Length, selection.Forecasts, cancellationToken: ct));
             OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
             ShowGraph($"Moving Average of {name}",
                 p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Moving Average of {name}"));
@@ -1265,14 +1366,15 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log($"Moving average: {ex.Message}"); }
     }
 
-    private void OnSingleExp(object sender, RoutedEventArgs e)
+    private async void OnSingleExp(object sender, RoutedEventArgs e)
     {
         var v = OpenSeries("Single Exponential Smoothing", TsFields.Alpha | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
+        var selection = new { dlg.Alpha, dlg.Forecasts };
         if (v.Length < 2) { Log("Need at least 2 points."); return; }
         try
         {
-            var r = TimeSeries.SingleExp(v, dlg.Alpha, dlg.Forecasts);
+            var r = await RunWorkAsync(ct => TimeSeries.SingleExp(v, selection.Alpha, selection.Forecasts, cancellationToken: ct));
             OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
             ShowGraph($"Single Exp Smoothing of {name}",
                 p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Single Exp Smoothing of {name}"));
@@ -1280,14 +1382,15 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log($"Single exponential smoothing: {ex.Message}"); }
     }
 
-    private void OnDoubleExp(object sender, RoutedEventArgs e)
+    private async void OnDoubleExp(object sender, RoutedEventArgs e)
     {
         var v = OpenSeries("Double Exponential Smoothing", TsFields.Alpha | TsFields.Beta | TsFields.Forecasts, out var dlg, out var name);
         if (v is null) return;
+        var selection = new { dlg.Alpha, dlg.Beta, dlg.Forecasts };
         if (v.Length < 3) { Log("Need at least 3 points."); return; }
         try
         {
-            var r = TimeSeries.DoubleExp(v, dlg.Alpha, dlg.Beta, dlg.Forecasts);
+            var r = await RunWorkAsync(ct => TimeSeries.DoubleExp(v, selection.Alpha, selection.Beta, selection.Forecasts, cancellationToken: ct));
             OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
             ShowGraph($"Double Exp Smoothing of {name}",
                 p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Double Exp Smoothing of {name}"));
@@ -1295,15 +1398,16 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log($"Double exponential smoothing: {ex.Message}"); }
     }
 
-    private void OnWinters(object sender, RoutedEventArgs e)
+    private async void OnWinters(object sender, RoutedEventArgs e)
     {
         var v = OpenSeries("Winters' Method",
             TsFields.Period | TsFields.Alpha | TsFields.Beta | TsFields.Gamma | TsFields.Multiplicative | TsFields.Forecasts,
             out var dlg, out var name);
         if (v is null) return;
+        var selection = new { dlg.Alpha, dlg.Beta, dlg.Forecasts, dlg.Gamma, dlg.Multiplicative, dlg.Period };
         try
         {
-            var r = TimeSeries.Winters(v, dlg.Period, dlg.Alpha, dlg.Beta, dlg.Gamma, dlg.Multiplicative, dlg.Forecasts);
+            var r = await RunWorkAsync(ct => TimeSeries.Winters(v, selection.Period, selection.Alpha, selection.Beta, selection.Gamma, selection.Multiplicative, selection.Forecasts, cancellationToken: ct));
             OutputRaw(TimeSeriesFormatters.Smoothing(r, name, v.Length));
             ShowGraph($"Winters' Method of {name}",
                 p => Plots.TimeSeriesFit(p, name, v, r.Fitted, r.Forecasts, $"Winters' Method of {name}"));
@@ -1311,15 +1415,16 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log($"Winters: {ex.Message}"); }
     }
 
-    private void OnDecomposition(object sender, RoutedEventArgs e)
+    private async void OnDecomposition(object sender, RoutedEventArgs e)
     {
         var v = OpenSeries("Time Series Decomposition", TsFields.Period | TsFields.Multiplicative, out var dlg, out var name);
         if (v is null) return;
-        if (v.Length < 2 * dlg.Period) { Log("Need at least two full seasons."); return; }
+        var selection = new { dlg.Multiplicative, dlg.Period };
+        if (selection.Period > v.Length / 2) { Log("Need at least two full seasons."); return; }
         // Multiplicative decomposition rejects non-positive observations (OnWinters already guards this).
         try
         {
-            var r = TimeSeries.Decompose(v, dlg.Period, dlg.Multiplicative);
+            var r = await RunWorkAsync(ct => TimeSeries.Decompose(v, selection.Period, selection.Multiplicative, cancellationToken: ct));
             OutputRaw(TimeSeriesFormatters.Decomposition(r, name));
             ShowGraph($"Decomposition of {name} (trend)",
                 p => Plots.TimeSeriesFit(p, name, v, r.Trend, Array.Empty<double>(), $"Decomposition of {name} (trend)"));
@@ -1333,27 +1438,25 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ArimaWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
-        IsEnabled = false;
-        StatusText.Text = $"Fitting ARIMA model for {dlg.SeriesColumn}…";
-        using var cts = StartFit();
+        var selection = new { dlg.D, dlg.Forecasts, dlg.IncludeConstant, dlg.P, dlg.Q, dlg.SeriesColumn };
+        double[] v;
+        try { v = ws.Find(selection.SeriesColumn)!.SeriesValues(); }
+        catch (ArgumentException ex) { Log(ex.Message); return; }
+        StatusText.Text = $"Fitting ARIMA model for {selection.SeriesColumn}…";
         try
         {
-            var r = await Task.Run(() => Arima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.Forecasts, dlg.IncludeConstant),
-                cts.Token);
-            if (cts.IsCancellationRequested || !IsLoaded) return;
+            var r = await RunWorkAsync(ct => Arima.Fit(v, selection.P, selection.D, selection.Q, selection.Forecasts, selection.IncludeConstant, ct));
 
             // Formatting and plotting stay inside the try: this is an async void method, so an
             // exception after the await has no catch site and would terminate the process.
-            OutputRaw(TimeSeriesFormatters.Arima(r, dlg.SeriesColumn));
+            OutputRaw(TimeSeriesFormatters.Arima(r, selection.SeriesColumn));
             if (r.Forecasts.Length > 0)
-                ShowGraph($"ARIMA Forecast of {dlg.SeriesColumn}",
-                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper,
-                        $"ARIMA Forecast of {dlg.SeriesColumn}"));
+                ShowGraph($"ARIMA Forecast of {selection.SeriesColumn}",
+                    p => Plots.ForecastPlot(p, selection.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper,
+                        $"ARIMA Forecast of {selection.SeriesColumn}"));
         }
         catch (OperationCanceledException) { Log("ARIMA: cancelled."); }
         catch (Exception ex) { Log($"ARIMA: {ex.Message}"); }
-        finally { IsEnabled = true; }
     }
 
     private async void OnSarima(object sender, RoutedEventArgs e)
@@ -1362,38 +1465,38 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new SarimaWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var v = ws.Find(dlg.SeriesColumn)!.NumericValues();
-        IsEnabled = false;
-        StatusText.Text = $"Fitting SARIMA model for {dlg.SeriesColumn}…";
-        using var cts = StartFit();
+        var selection = new { dlg.D, dlg.Forecasts, dlg.IncludeConstant, dlg.P, dlg.Q, dlg.SD, dlg.SP, dlg.SQ, dlg.Season, dlg.SeriesColumn };
+        double[] v;
+        try { v = ws.Find(selection.SeriesColumn)!.SeriesValues(); }
+        catch (ArgumentException ex) { Log(ex.Message); return; }
+        StatusText.Text = $"Fitting SARIMA model for {selection.SeriesColumn}…";
         try
         {
-            var r = await Task.Run(() => Sarima.Fit(v, dlg.P, dlg.D, dlg.Q, dlg.SP, dlg.SD, dlg.SQ,
-                dlg.Season, dlg.Forecasts, dlg.IncludeConstant), cts.Token);
-            if (cts.IsCancellationRequested || !IsLoaded) return;
+            var r = await RunWorkAsync(ct => Sarima.Fit(v, selection.P, selection.D, selection.Q, selection.SP, selection.SD, selection.SQ,
+                selection.Season, selection.Forecasts, selection.IncludeConstant, ct));
 
-            OutputRaw(TimeSeriesFormatters.Sarima(r, dlg.SeriesColumn));
+            OutputRaw(TimeSeriesFormatters.Sarima(r, selection.SeriesColumn));
             if (r.Forecasts.Length > 0)
-                ShowGraph($"SARIMA Forecast of {dlg.SeriesColumn}",
-                    p => Plots.ForecastPlot(p, dlg.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper,
-                        $"SARIMA Forecast of {dlg.SeriesColumn}"));
+                ShowGraph($"SARIMA Forecast of {selection.SeriesColumn}",
+                    p => Plots.ForecastPlot(p, selection.SeriesColumn, v, r.Forecasts, r.ForecastLower, r.ForecastUpper,
+                        $"SARIMA Forecast of {selection.SeriesColumn}"));
         }
         catch (OperationCanceledException) { Log("SARIMA: cancelled."); }
         catch (Exception ex) { Log($"SARIMA: {ex.Message}"); }
-        finally { IsEnabled = true; }
     }
 
     private void OnAcf(object sender, RoutedEventArgs e) => RunAcf(false);
     private void OnPacf(object sender, RoutedEventArgs e) => RunAcf(true);
 
-    private void RunAcf(bool partial)
+    private async void RunAcf(bool partial)
     {
         var v = OpenSeries(partial ? "Partial Autocorrelation" : "Autocorrelation", TsFields.MaxLag, out var dlg, out var name);
         if (v is null) return;
+        var selection = new { dlg.MaxLag };
         if (v.Length < 4) { Log("Need at least 4 points."); return; }
         try
         {
-            var r = TimeSeries.Autocorrelation(v, dlg.MaxLag);
+            var r = await RunWorkAsync(ct => TimeSeries.Autocorrelation(v, selection.MaxLag, cancellationToken: ct));
             OutputRaw(TimeSeriesFormatters.Acf(r, name, partial));
             var vals = partial ? r.Pacf : r.Acf;
             ShowGraph($"{(partial ? "PACF" : "ACF")} of {name}",
@@ -1410,11 +1513,12 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new TwoColumnWindow(numeric, "Mann-Whitney", showPooled: false) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var x1 = ws.Find(dlg.Column1)!.NumericValues();
-        var x2 = ws.Find(dlg.Column2)!.NumericValues();
+        var selection = new { dlg.Alt, dlg.Column1, dlg.Column2 };
+        var x1 = ws.Find(selection.Column1)!.NumericValues();
+        var x2 = ws.Find(selection.Column2)!.NumericValues();
         if (x1.Length < 1 || x2.Length < 1) { Log("Each sample needs data."); return; }
-        var r = Nonparametric.MannWhitney(x1, x2, dlg.Alt);
-        OutputRaw(NonparametricFormatters.MannWhitney(r, dlg.Column1, dlg.Column2));
+        var r = Nonparametric.MannWhitney(x1, x2, selection.Alt);
+        OutputRaw(NonparametricFormatters.MannWhitney(r, selection.Column1, selection.Column2));
     }
 
     private void OnWilcoxon(object sender, RoutedEventArgs e)
@@ -1423,12 +1527,13 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new OneSampleTWindow(numeric) { Owner = this, Title = "Wilcoxon Signed-Rank" };
         if (dlg.ShowDialog() != true) return;
-        foreach (var n in dlg.SelectedColumns)
+        var selection = new { dlg.Alt, dlg.Mu0, dlg.SelectedColumns };
+        foreach (var n in selection.SelectedColumns)
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length < 2) { Log($"{n}: need at least 2 values."); continue; }
             OutputRaw(NonparametricFormatters.Wilcoxon(
-                Nonparametric.WilcoxonSignedRank(v, dlg.Mu0, dlg.Alt), n, dlg.Mu0));
+                Nonparametric.WilcoxonSignedRank(v, selection.Mu0, selection.Alt), n, selection.Mu0));
         }
     }
 
@@ -1438,7 +1543,8 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Kruskal-Wallis", "Response columns (each column is a group):", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var groups = dlg.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
+        var selection = new { dlg.SelectedColumns };
+        var groups = selection.SelectedColumns.Select(n => (n, ws.Find(n)!.NumericValues()))
             .Where(t => t.Item2.Length > 0).ToList();
         if (groups.Count < 2) { Log("Need at least 2 non-empty groups."); return; }
         OutputRaw(NonparametricFormatters.KruskalWallis(Nonparametric.KruskalWallis(groups), "Response", "Factor"));
@@ -1450,12 +1556,13 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new OneSampleTWindow(numeric) { Owner = this, Title = "Sign Test for Median" };
         if (dlg.ShowDialog() != true) return;
-        foreach (var n in dlg.SelectedColumns)
+        var selection = new { dlg.Alt, dlg.Mu0, dlg.SelectedColumns };
+        foreach (var n in selection.SelectedColumns)
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length < 1) { Log($"{n}: no data."); continue; }
             OutputRaw(NonparametricFormatters.SignTest(
-                Nonparametric.SignTest(v, dlg.Mu0, dlg.Alt), n, dlg.Mu0));
+                Nonparametric.SignTest(v, selection.Mu0, selection.Alt), n, selection.Mu0));
         }
     }
 
@@ -1465,7 +1572,8 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Runs Test", "Columns to test for randomness:", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        foreach (var n in dlg.SelectedColumns)
+        var selection = new { dlg.SelectedColumns };
+        foreach (var n in selection.SelectedColumns)
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length < 3) { Log($"{n}: need at least 3 values."); continue; }
@@ -1478,69 +1586,75 @@ public partial class MainWindow : Window
     private void OnCorrelationPearson(object sender, RoutedEventArgs e) => Correlate(false);
     private void OnCorrelationSpearman(object sender, RoutedEventArgs e) => Correlate(true);
 
-    private void Correlate(bool spearman)
+    private async void Correlate(bool spearman)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow(spearman ? "Correlation (Spearman)" : "Correlation (Pearson)",
-            "Variables (2 or more):", numeric) { Owner = this };
+            "Variables (2 or more):", numeric)
+        { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var selection = new { dlg.SelectedColumns };
+        var cols = selection.SelectedColumns.Select(n => ws.Find(n)!).ToList();
         if (cols.Count < 2) { Log("Select at least two variables."); return; }
-        OutputRaw(NonparametricFormatters.Correlation(Correlation.Matrix(cols, spearman)));
+        OutputRaw(NonparametricFormatters.Correlation(await RunWorkAsync(ct => Correlation.Matrix(cols, spearman))));
     }
 
-    private void OnNormalityTest(object sender, RoutedEventArgs e)
+    private async void OnNormalityTest(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Normality Test", "Variables to test:", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        foreach (var n in dlg.SelectedColumns)
+        var selection = new { dlg.SelectedColumns };
+        foreach (var n in selection.SelectedColumns)
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length < 3) { Log($"{n}: need at least 3 values."); continue; }
             // Anderson-Darling requires variation; a constant column must not end the loop.
             try
             {
-                OutputRaw(NonparametricFormatters.AndersonDarling(Normality.AndersonDarling(v), n));
+                OutputRaw(NonparametricFormatters.AndersonDarling(await RunWorkAsync(ct => Normality.AndersonDarling(v)), n));
                 ShowGraph($"Probability Plot of {n}", p => Plots.ProbabilityPlot(p, n, v));
             }
+            catch (OperationCanceledException) { Log("Normality: cancelled."); return; }
             catch (Exception ex) { Log($"{n}: {ex.Message}"); }
         }
     }
-    private void OnSimpleRegression(object sender, RoutedEventArgs e)
+    private async void OnSimpleRegression(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new XyPickerWindow(numeric, "Simple Regression") { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var (xs, ys) = Columns.Pairwise(ws.Find(dlg.XColumn)!, ws.Find(dlg.YColumn)!);
+        var selection = new { dlg.XColumn, dlg.YColumn };
+        var (xs, ys) = Columns.Pairwise(ws.Find(selection.XColumn)!, ws.Find(selection.YColumn)!);
         if (xs.Length < 3) { Log("Need at least 3 paired observations."); return; }
         try
         {
-            var r = Regression.SimpleLinear(xs, ys, dlg.XColumn, dlg.YColumn);
+            var r = await RunWorkAsync(ct => Regression.SimpleLinear(xs, ys, selection.XColumn, selection.YColumn));
             OutputRaw(RegressionFormatter.Format(r));
-            ShowGraph($"Fitted Line Plot of {dlg.YColumn} vs {dlg.XColumn}",
-                p => Plots.FittedLine(p, dlg.XColumn, dlg.YColumn, xs, ys, r.Coefficients[0], r.Coefficients[1]));
+            ShowGraph($"Fitted Line Plot of {selection.YColumn} vs {selection.XColumn}",
+                p => Plots.FittedLine(p, selection.XColumn, selection.YColumn, xs, ys, r.Coefficients[0], r.Coefficients[1]));
             ShowGraph("Residuals vs Fitted", p => Plots.ResidualVsFitted(p, r.Fitted, r.Residuals));
         }
         catch (Exception ex) { Log($"Regression: {ex.Message}"); }
     }
 
-    private void OnMultipleRegression(object sender, RoutedEventArgs e)
+    private async void OnMultipleRegression(object sender, RoutedEventArgs e)
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new RegressionWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var resp = ws.Find(dlg.Response)!;
-        var preds = dlg.Predictors.Select(n => ws.Find(n)!).ToList();
+        var selection = new { dlg.Predictors, dlg.Response };
+        var resp = ws.Find(selection.Response)!;
+        var preds = selection.Predictors.Select(n => ws.Find(n)!).ToList();
         var (y, x) = Columns.Design(resp, preds);
         if (y.Length <= preds.Count + 1) { Log("Not enough complete rows for the number of predictors."); return; }
         try
         {
-            var r = Regression.Fit(y, x, dlg.Predictors, dlg.Response);
+            var r = await RunWorkAsync(ct => Regression.Fit(y, x, selection.Predictors, selection.Response));
             OutputRaw(RegressionFormatter.Format(r));
             ShowGraph("Residuals vs Fitted", p => Plots.ResidualVsFitted(p, r.Fitted, r.Residuals));
         }
@@ -1554,9 +1668,11 @@ public partial class MainWindow : Window
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new ColumnPickerWindow($"{kind} Chart",
-            "Subgroup columns (each row across them is a subgroup):", numeric) { Owner = this };
+            "Subgroup columns (each row across them is a subgroup):", numeric)
+        { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var cols = dlg.SelectedColumns.Select(n => ws.Find(n)!).ToList();
+        var selection = new { dlg.SelectedColumns };
+        var cols = selection.SelectedColumns.Select(n => ws.Find(n)!).ToList();
         var subgroups = Columns.Rows(cols);
         try
         {
@@ -1572,9 +1688,12 @@ public partial class MainWindow : Window
     {
         var ws = CurrentWorksheet();
         if (!RequireNumeric(ws, 1, out var numeric)) return;
-        var dlg = new ColumnPickerWindow("I-MR Chart", "Column of individual measurements:", numeric) { Owner = this };
+        var dlg = new ColumnPickerWindow("I-MR Chart", "Column of individual measurements:", numeric, singleSelection: true) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var v = ws.Find(dlg.SelectedColumns[0])!.NumericValues();
+        var selection = new { dlg.SelectedColumns };
+        double[] v;
+        try { v = ws.Find(selection.SelectedColumns[0])!.SeriesValues(); }
+        catch (ArgumentException ex) { Log(ex.Message); return; }
         if (v.Length < 2) { Log("Need at least 2 values."); return; }
         var (ind, mr) = ControlCharts.IMR(v);
         OutputRaw(SpcFormatter.Pair("I-MR Chart", ind, mr));
@@ -1607,7 +1726,8 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new AttributeChartWindow(numeric, $"{kind} Chart", needSizesColumn: true, needConstantSize: false) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var (countValues, sizeValues) = Columns.Pairwise(ws.Find(dlg.CountsColumn)!, ws.Find(dlg.SizesColumn)!);
+        var selection = new { dlg.CountsColumn, dlg.SizesColumn };
+        var (countValues, sizeValues) = Columns.Pairwise(ws.Find(selection.CountsColumn)!, ws.Find(selection.SizesColumn)!);
         if (countValues.Length < 2) { Log("Need at least 2 complete rows."); return; }
         if (!TryCounts(countValues, positive: false, out var counts, out var error) ||
             !TryCounts(sizeValues, positive: true, out var sizes, out error))
@@ -1629,12 +1749,13 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new AttributeChartWindow(numeric, "NP Chart", needSizesColumn: false, needConstantSize: true) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        if (!TryCounts(ws.Find(dlg.CountsColumn)!.NumericValues(), positive: false, out var counts, out var error))
+        var selection = new { dlg.ConstantSize, dlg.CountsColumn };
+        if (!TryCounts(ws.Find(selection.CountsColumn)!.NumericValues(), positive: false, out var counts, out var error))
         { Log(error); return; }
         if (counts.Length < 2) { Log("Need at least 2 rows."); return; }
         try
         {
-            var chart = ControlCharts.NPChart(counts, dlg.ConstantSize);
+            var chart = ControlCharts.NPChart(counts, selection.ConstantSize);
             OutputRaw(SpcFormatter.Chart(chart));
             ShowGraph(chart.Title, p => Plots.ControlChart(p, chart));
         }
@@ -1647,7 +1768,8 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new AttributeChartWindow(numeric, "C Chart", needSizesColumn: false, needConstantSize: false) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        if (!TryCounts(ws.Find(dlg.CountsColumn)!.NumericValues(), positive: false, out var counts, out var error))
+        var selection = new { dlg.CountsColumn };
+        if (!TryCounts(ws.Find(selection.CountsColumn)!.NumericValues(), positive: false, out var counts, out var error))
         { Log(error); return; }
         if (counts.Length < 2) { Log("Need at least 2 rows."); return; }
         try
@@ -1665,14 +1787,17 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new CapabilityWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var v = ws.Find(dlg.DataColumn)!.NumericValues();
+        var selection = new { dlg.DataColumn, dlg.Lsl, dlg.Target, dlg.Usl };
+        double[] v;
+        try { v = ws.Find(selection.DataColumn)!.SeriesValues(); }
+        catch (ArgumentException ex) { Log(ex.Message); return; }
         if (v.Length < 2) { Log("Need at least 2 values."); return; }
         try
         {
-            var cap = Capability.FromIndividuals(v, dlg.Lsl, dlg.Usl, dlg.Target);
+            var cap = Capability.FromIndividuals(v, selection.Lsl, selection.Usl, selection.Target);
             OutputRaw(SpcFormatter.Capability(cap));
-            ShowGraph($"Process Capability of {dlg.DataColumn}",
-                p => Plots.CapabilityHistogram(p, dlg.DataColumn, v, dlg.Lsl, dlg.Usl, dlg.Target));
+            ShowGraph($"Process Capability of {selection.DataColumn}",
+                p => Plots.CapabilityHistogram(p, selection.DataColumn, v, selection.Lsl, selection.Usl, selection.Target));
         }
         catch (Exception ex) { Log($"Capability: {ex.Message}"); }
     }
@@ -1685,8 +1810,9 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Histogram", "Graph variables:", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.SelectedColumns };
         int made = 0;
-        foreach (var n in dlg.SelectedColumns)
+        foreach (var n in selection.SelectedColumns)
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length == 0) { Log($"{n}: no data."); continue; }
@@ -1702,7 +1828,8 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Boxplot", "Graph variables:", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var series = dlg.SelectedColumns
+        var selection = new { dlg.SelectedColumns };
+        var series = selection.SelectedColumns
             .Select(n => (Name: n, Values: ws.Find(n)!.NumericValues()))
             .Where(t => t.Values.Length > 0).ToList();
         if (series.Count == 0) { Log("No data to plot."); return; }
@@ -1716,10 +1843,11 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 2, out var numeric)) return;
         var dlg = new XyPickerWindow(numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
-        var (xs, ys) = Columns.Pairwise(ws.Find(dlg.XColumn)!, ws.Find(dlg.YColumn)!);
+        var selection = new { dlg.XColumn, dlg.YColumn };
+        var (xs, ys) = Columns.Pairwise(ws.Find(selection.XColumn)!, ws.Find(selection.YColumn)!);
         if (xs.Length == 0) { Log("No paired (X, Y) rows to plot."); return; }
-        ShowGraph($"Scatterplot of {dlg.YColumn} vs {dlg.XColumn}",
-            p => Plots.Scatter(p, dlg.XColumn, dlg.YColumn, xs, ys));
+        ShowGraph($"Scatterplot of {selection.YColumn} vs {selection.XColumn}",
+            p => Plots.Scatter(p, selection.XColumn, selection.YColumn, xs, ys));
         Log($"Scatterplot: {xs.Length} points.");
     }
 
@@ -1729,10 +1857,13 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Time Series Plot", "Graph variables:", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.SelectedColumns };
         int made = 0;
-        foreach (var n in dlg.SelectedColumns)
+        foreach (var n in selection.SelectedColumns)
         {
-            var v = ws.Find(n)!.NumericValues();
+            double[] v;
+            try { v = ws.Find(n)!.SeriesValues(); }
+            catch (ArgumentException ex) { Log(ex.Message); continue; }
             if (v.Length == 0) { Log($"{n}: no data."); continue; }
             ShowGraph($"Time Series Plot of {n}", p => Plots.TimeSeries(p, n, v));
             made++;
@@ -1746,8 +1877,9 @@ public partial class MainWindow : Window
         if (!RequireNumeric(ws, 1, out var numeric)) return;
         var dlg = new ColumnPickerWindow("Probability Plot", "Graph variables:", numeric) { Owner = this };
         if (dlg.ShowDialog() != true) return;
+        var selection = new { dlg.SelectedColumns };
         int made = 0;
-        foreach (var n in dlg.SelectedColumns)
+        foreach (var n in selection.SelectedColumns)
         {
             var v = ws.Find(n)!.NumericValues();
             if (v.Length < 3) { Log($"{n}: need at least 3 values."); continue; }
@@ -1758,8 +1890,6 @@ public partial class MainWindow : Window
     }
 
     // ---- misc --------------------------------------------------------------
-
-    private void OnNavDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { }
 
     private void OnGridAutoGeneratingColumn(object? sender, DataGridAutoGeneratingColumnEventArgs e)
     {

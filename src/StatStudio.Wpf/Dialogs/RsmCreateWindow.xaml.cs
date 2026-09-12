@@ -33,7 +33,7 @@ public partial class RsmCreateWindow : Window
     private void OnOk(object sender, RoutedEventArgs e)
     {
         if (FactorsCombo.SelectedItem is null) { Warn("Pick the number of factors."); return; }
-        if (!TestOptions.ParseInt(CenterBox.Text, out var cp) || cp < 0) { Warn("Center points must be ≥ 0."); return; }
+        if (!TestOptions.ParseInt(CenterBox.Text, out var cp) || cp < 0 || cp > 9900) { Warn("Center points must be between 0 and 9900."); return; }
         Factors = (int)FactorsCombo.SelectedItem;
         CenterPoints = cp;
         DialogResult = true;

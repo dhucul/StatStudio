@@ -43,6 +43,10 @@ public static class Normality
     // Standard Anderson-Darling p-value (normal, parameters estimated) — D'Agostino & Stephens.
     private static double PValue(double a)
     {
+        if (!double.IsFinite(a) || a < 0) return double.NaN;
+        // The fitted quadratic tail is not valid indefinitely: its slope eventually
+        // reverses. At A* >= 100 the decreasing tail is already below 1e-160.
+        if (a >= 100) return 0;
         if (a >= 0.6) return Math.Exp(1.2937 - 5.709 * a + 0.0186 * a * a);
         if (a > 0.34) return Math.Exp(0.9177 - 4.279 * a - 1.38 * a * a);
         if (a > 0.2) return 1 - Math.Exp(-8.318 + 42.796 * a - 59.938 * a * a);

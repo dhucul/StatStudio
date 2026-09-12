@@ -18,42 +18,43 @@ public sealed record ArimaResult(
 public static class Arima
 {
     public static ArimaResult Fit(double[] series, int p, int d, int q,
-        int forecasts = 0, bool includeConstant = true)
+        int forecasts = 0, bool includeConstant = true, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(series);
         if (p < 0 || q < 0 || d < 0 || p > 5 || q > 5 || d > 2)
             throw new ArgumentException("ARIMA orders out of range (p,q ≤ 5, d ≤ 2).");
-        if (forecasts < 0) throw new ArgumentOutOfRangeException(nameof(forecasts));
+        if (forecasts < 0 || forecasts > AnalysisLimits.MaxForecasts) throw new ArgumentOutOfRangeException(nameof(forecasts));
         StatGuard.Finite(series, nameof(series));
         if (series.Length <= d)
             throw new ArgumentException("Series is too short for the requested differencing order.", nameof(series));
 
         double[] w = series;
-        for (int i = 0; i < d; i++) w = Diff(w);
+        for (int i = 0; i < d; i++) w = Diff(w, cancellationToken);
         int m = w.Length;
         int nc = includeConstant ? 1 : 0;
         int nParams = nc + p + q;
-        if (m <= nParams + 2) throw new ArgumentException("Series too short for the specified ARIMA order.");
+        if (m <= nParams + 2 || m - p <= nParams) throw new ArgumentException("Series too short for the specified ARIMA order.");
 
         double[] theta;
         if (q == 0)
-            theta = FitArOls(w, p, includeConstant);
+            theta = FitArOls(w, p, includeConstant, cancellationToken);
         else
         {
             var start = new double[nParams];
             if (p > 0)
             {
-                var ar = FitArOls(w, p, includeConstant);
+                var ar = FitArOls(w, p, includeConstant, cancellationToken);
                 Array.Copy(ar, start, Math.Min(ar.Length, nParams));
             }
             else if (includeConstant) start[0] = w.Average();
-            var obj = ObjectiveFunction.Value(v => Css(w, v.ToArray(), p, q, includeConstant));
+            var obj = ObjectiveFunction.Value(v => Css(w, v.ToArray(), p, q, includeConstant, cancellationToken));
             var solver = new NelderMeadSimplex(1e-10, 5000);
             var res = solver.FindMinimum(obj, Vector<double>.Build.DenseOfArray(start));
             theta = res.MinimizingPoint.ToArray();
         }
 
-        var resid = Residuals(w, theta, p, q, includeConstant);
+        var resid = Residuals(w, theta, p, q, includeConstant, cancellationToken);
         int nEff = m - p;
         double ss = 0;
         for (int t = p; t < m; t++) ss += resid[t] * resid[t];
@@ -61,7 +62,7 @@ public static class Arima
         double logLik = -0.5 * nEff * (Math.Log(2 * Math.PI * sigma2) + 1);
         double aic = -2 * logLik + 2 * (nParams + 1);
 
-        var se = StdErrors(w, theta, p, q, includeConstant, sigma2, nParams);
+        var se = StdErrors(w, theta, p, q, includeConstant, sigma2, nParams, cancellationToken);
         var terms = new List<ArimaTerm>();
         var tdist = new StudentT(0, 1, Math.Max(1, nEff - nParams));
         int idx = 0;
@@ -69,19 +70,21 @@ public static class Arima
         for (int i = 1; i <= p; i++) terms.Add(MakeTerm($"AR({i})", theta[idx], se[idx++], tdist));
         for (int j = 1; j <= q; j++) terms.Add(MakeTerm($"MA({j})", theta[idx], se[idx++], tdist));
 
-        var (fc, lo, hi) = Forecast(series, w, theta, p, d, q, includeConstant, resid, sigma2, forecasts);
+        var (fc, lo, hi) = Forecast(series, w, theta, p, d, q, includeConstant, resid, sigma2, forecasts, cancellationToken);
         return new ArimaResult(p, d, q, includeConstant, terms, sigma2, logLik, aic,
             resid[p..], fc, lo, hi, series.Length);
     }
 
     // ---- core recursions ---------------------------------------------------
 
-    private static double[] Residuals(double[] w, double[] theta, int p, int q, bool c)
+    private static double[] Residuals(double[] w, double[] theta, int p, int q, bool c, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         int m = w.Length, nc = c ? 1 : 0;
         var e = new double[m];
         for (int t = p; t < m; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double pred = c ? theta[0] : 0;
             for (int i = 1; i <= p; i++) pred += theta[nc + i - 1] * w[t - i];
             for (int j = 1; j <= q; j++) pred += theta[nc + p + j - 1] * (t - j >= p ? e[t - j] : 0);
@@ -90,16 +93,18 @@ public static class Arima
         return e;
     }
 
-    private static double Css(double[] w, double[] theta, int p, int q, bool c)
+    private static double Css(double[] w, double[] theta, int p, int q, bool c, CancellationToken cancellationToken)
     {
-        var e = Residuals(w, theta, p, q, c);
+        cancellationToken.ThrowIfCancellationRequested();
+        var e = Residuals(w, theta, p, q, c, cancellationToken);
         double ss = 0;
         for (int t = p; t < w.Length; t++) ss += e[t] * e[t];
         return ss;
     }
 
-    private static double[] FitArOls(double[] w, int p, bool c)
+    private static double[] FitArOls(double[] w, int p, bool c, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         int m = w.Length, nc = c ? 1 : 0, cols = nc + p;
         int rows = m - p;
         var X = Matrix<double>.Build.Dense(rows, cols);
@@ -116,8 +121,9 @@ public static class Arima
             X, Y, "Cannot fit ARIMA — the autoregressive design is singular.").Solution.ToArray();
     }
 
-    private static double[] StdErrors(double[] w, double[] theta, int p, int q, bool c, double sigma2, int nParams)
+    private static double[] StdErrors(double[] w, double[] theta, int p, int q, bool c, double sigma2, int nParams, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             int m = w.Length, rows = m - p;
@@ -125,10 +131,11 @@ public static class Arima
             double h = 1e-5;
             for (int k = 0; k < nParams; k++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var up = (double[])theta.Clone(); up[k] += h;
                 var dn = (double[])theta.Clone(); dn[k] -= h;
-                var eu = Residuals(w, up, p, q, c);
-                var ed = Residuals(w, dn, p, q, c);
+                var eu = Residuals(w, up, p, q, c, cancellationToken);
+                var ed = Residuals(w, dn, p, q, c, cancellationToken);
                 for (int t = p; t < m; t++) J[t - p, k] = (eu[t] - ed[t]) / (2 * h);
             }
             var cov = (J.TransposeThisAndMultiply(J)).Inverse() * sigma2;
@@ -136,6 +143,7 @@ public static class Arima
             for (int k = 0; k < nParams; k++) se[k] = Math.Sqrt(Math.Max(0, cov[k, k]));
             return se;
         }
+        catch (OperationCanceledException) { throw; }
         catch
         {
             return Enumerable.Repeat(double.NaN, nParams).ToArray();
@@ -145,8 +153,9 @@ public static class Arima
     // ---- forecasting -------------------------------------------------------
 
     private static (double[] Fc, double[] Lo, double[] Hi) Forecast(double[] series, double[] w, double[] theta,
-        int p, int d, int q, bool c, double[] resid, double sigma2, int h)
+        int p, int d, int q, bool c, double[] resid, double sigma2, int h, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (h <= 0) return (Array.Empty<double>(), Array.Empty<double>(), Array.Empty<double>());
         int m = w.Length, nc = c ? 1 : 0;
 
@@ -156,6 +165,7 @@ public static class Arima
         Array.Copy(resid, eExt, m);
         for (int t = m; t < m + h; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double pred = c ? theta[0] : 0;
             for (int i = 1; i <= p; i++) pred += theta[nc + i - 1] * wExt[t - i];
             for (int j = 1; j <= q; j++) pred += theta[nc + p + j - 1] * (t - j < m ? eExt[t - j] : 0);
@@ -168,7 +178,7 @@ public static class Arima
         // Integrate back to the original scale using the last value of each difference level.
         var lastVal = new double[d];
         var cur = series;
-        for (int l = 0; l < d; l++) { lastVal[l] = cur[^1]; cur = Diff(cur); }
+        for (int l = 0; l < d; l++) { lastVal[l] = cur[^1]; cur = Diff(cur, cancellationToken); }
 
         var fc = new double[h];
         for (int step = 0; step < h; step++)
@@ -179,7 +189,7 @@ public static class Arima
         }
 
         // Forecast-error variance after applying every inverse differencing filter.
-        var impulse = PsiWeights(theta, p, q, c, h);
+        var impulse = PsiWeights(theta, p, q, c, h, cancellationToken);
         for (int level = 0; level < d; level++)
             for (int i = 1; i < h; i++)
                 impulse[i] += impulse[i - 1];
@@ -196,8 +206,9 @@ public static class Arima
         return (fc, lo, hi);
     }
 
-    private static double[] PsiWeights(double[] theta, int p, int q, bool c, int h)
+    private static double[] PsiWeights(double[] theta, int p, int q, bool c, int h, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         int nc = c ? 1 : 0;
         var psi = new double[h];
         psi[0] = 1;
@@ -212,8 +223,9 @@ public static class Arima
 
     // ---- helpers -----------------------------------------------------------
 
-    private static double[] Diff(double[] x)
+    private static double[] Diff(double[] x, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var r = new double[x.Length - 1];
         for (int i = 0; i < r.Length; i++) r[i] = x[i + 1] - x[i];
         return r;

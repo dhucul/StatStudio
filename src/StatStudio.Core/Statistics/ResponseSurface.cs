@@ -16,6 +16,8 @@ public static class ResponseSurface
         if (k < 2 || k > 5) throw new ArgumentException("CCD supports 2..5 factors.");
         if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
         int cube = 1 << k;
+        if ((long)cube + 2 * k + centerPoints > AnalysisLimits.MaxDesignRuns)
+            throw new ArgumentOutOfRangeException(nameof(centerPoints), "Designs are limited to 10000 runs.");
         double alpha = faceCentered ? 1.0 : Math.Pow(cube, 0.25);
 
         var runs = new List<RsmRun>();
@@ -43,6 +45,8 @@ public static class ResponseSurface
         if (k < 3 || k > 5) throw new ArgumentException("Box-Behnken supports 3..5 factors.");
         if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
         var runs = new List<RsmRun>();
+        if ((long)2 * k * (k - 1) + centerPoints > AnalysisLimits.MaxDesignRuns)
+            throw new ArgumentOutOfRangeException(nameof(centerPoints), "Designs are limited to 10000 runs.");
         int std = 0;
         for (int i = 0; i < k; i++)
             for (int j = i + 1; j < k; j++)

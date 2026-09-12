@@ -2,14 +2,15 @@ namespace StatStudio.Core.Statistics;
 
 public sealed record KMeansResult(
     int K, IReadOnlyList<string> Variables, int[] Assignments, double[][] Centroids,
-    int[] Sizes, double[] WithinSS, double TotalWithinSS, int Iterations);
+    int[] Sizes, double[] WithinSS, double TotalWithinSS, int Iterations, bool Converged = true);
 
 public static class KMeans
 {
     /// <summary>k-means clustering (Lloyd's algorithm, k-means++ seeding) on n×p data.</summary>
     public static KMeansResult Cluster(double[][] data, int k, IReadOnlyList<string> names,
-        int maxIter = 100, int seed = 12345)
+        int maxIter = 100, int seed = 12345, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(names);
         int n = data.Length, p = names.Count;
@@ -22,18 +23,22 @@ public static class KMeans
             throw new ArgumentException("K-means values must be finite.", nameof(data));
 
         var rnd = new Random(seed);
-        var centroids = SeedPlusPlus(data, k, p, rnd);
+        var centroids = SeedPlusPlus(data, k, p, rnd, cancellationToken);
         var assign = new int[n];
         int iter = 0;
+        bool converged = false;
 
         for (; iter < maxIter; iter++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             bool changed = false;
             for (int i = 0; i < n; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 int best = 0; double bestD = double.MaxValue;
                 for (int c = 0; c < k; c++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     double d = Dist2(data[i], centroids[c]);
                     if (d < bestD) { bestD = d; best = c; }
                 }
@@ -45,11 +50,13 @@ public static class KMeans
             for (int c = 0; c < k; c++) sum[c] = new double[p];
             for (int i = 0; i < n; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 cnt[assign[i]]++;
                 for (int j = 0; j < p; j++) sum[assign[i]][j] += data[i][j];
             }
             for (int c = 0; c < k; c++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (cnt[c] != 0) continue;
                 // Some cluster always holds >= 2 points here (n >= k and this one is empty),
                 // so MaxBy is safe — and O(n) rather than the O(n log n) full sort it replaces.
@@ -62,6 +69,7 @@ public static class KMeans
                 cnt[c] = 1;
                 for (int j = 0; j < p; j++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     sum[previous][j] -= data[farthest][j];
                     sum[c][j] = data[farthest][j];
                 }
@@ -70,26 +78,29 @@ public static class KMeans
             for (int c = 0; c < k; c++)
                 for (int j = 0; j < p; j++) centroids[c][j] = sum[c][j] / cnt[c];
 
-            if (!changed) { iter++; break; }
+            if (!changed) { converged = true; iter++; break; }
         }
 
         var within = new double[k];
         var sizes = new int[k];
         for (int i = 0; i < n; i++) { within[assign[i]] += Dist2(data[i], centroids[assign[i]]); sizes[assign[i]]++; }
-        return new KMeansResult(k, names, assign, centroids, sizes, within, within.Sum(), iter);
+        return new KMeansResult(k, names, assign, centroids, sizes, within, within.Sum(), iter, converged);
     }
 
-    private static double[][] SeedPlusPlus(double[][] data, int k, int p, Random rnd)
+    private static double[][] SeedPlusPlus(double[][] data, int k, int p, Random rnd, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         int n = data.Length;
         var centroids = new double[k][];
         centroids[0] = (double[])data[rnd.Next(n)].Clone();
         var d2 = new double[n];
         for (int c = 1; c < k; c++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double total = 0;
             for (int i = 0; i < n; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 double best = double.MaxValue;
                 for (int j = 0; j < c; j++) best = Math.Min(best, Dist2(data[i], centroids[j]));
                 d2[i] = best; total += best;

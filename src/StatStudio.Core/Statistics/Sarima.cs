@@ -16,14 +16,17 @@ public sealed record SarimaResult(
 public static class Sarima
 {
     public static SarimaResult Fit(double[] series, int p, int d, int q,
-        int sp, int sd, int sq, int s, int forecasts = 0, bool includeConstant = true)
+        int sp, int sd, int sq, int s, int forecasts = 0, bool includeConstant = true, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(series);
-        if (s < 1) throw new ArgumentException("Seasonal period must be ≥ 1.");
+        if (s < 1 || s > AnalysisLimits.MaxSeason) throw new ArgumentException("Seasonal period must be between 1 and 10000.");
         if (p < 0 || q < 0 || sp < 0 || sq < 0 || d < 0 || sd < 0 ||
             p > 5 || q > 5 || sp > 3 || sq > 3 || d > 2 || sd > 2)
             throw new ArgumentException("SARIMA orders out of range (p,q <= 5; P,Q <= 3; d,D <= 2).");
-        if (forecasts < 0) throw new ArgumentOutOfRangeException(nameof(forecasts));
+        if (forecasts < 0 || forecasts > AnalysisLimits.MaxForecasts) throw new ArgumentOutOfRangeException(nameof(forecasts));
+        if (s == 1 && (sp > 0 || sd > 0 || sq > 0))
+            throw new ArgumentException("Seasonal terms require a period of at least 2.");
         StatGuard.Finite(series, nameof(series));
 
         // Difference: regular d times, then seasonal D times — recording each stage for integration.
@@ -32,12 +35,12 @@ public static class Sarima
         for (int i = 0; i < d; i++)
         {
             if (cur.Length <= 1) throw new ArgumentException("Series is too short for regular differencing.");
-            stages.Add((1, cur)); cur = Diff(cur, 1);
+            stages.Add((1, cur)); cur = Diff(cur, 1, cancellationToken);
         }
         for (int i = 0; i < sd; i++)
         {
             if (cur.Length <= s) throw new ArgumentException("Series is too short for seasonal differencing.");
-            stages.Add((s, cur)); cur = Diff(cur, s);
+            stages.Add((s, cur)); cur = Diff(cur, s, cancellationToken);
         }
         double[] w = cur;
         int m = w.Length;
@@ -45,7 +48,7 @@ public static class Sarima
         int nc = includeConstant ? 1 : 0;
         int nParams = nc + p + sp + q + sq;
         int maxArLag = p + sp * s;
-        if (m <= maxArLag + 2) throw new ArgumentException("Series too short for the specified SARIMA order.");
+        if (m <= Math.Max(maxArLag, q + sq * s) + 2 || m - maxArLag <= nParams) throw new ArgumentException("Series too short for the specified SARIMA order.");
 
         double[] theta;
         if (nParams == 0) theta = Array.Empty<double>();
@@ -56,13 +59,13 @@ public static class Sarima
             if (nParams == nc) theta = start; // constant only -> CSS minimized at mean
             else
             {
-                var obj = ObjectiveFunction.Value(v => Css(w, v.ToArray(), p, sp, q, sq, s, includeConstant, maxArLag));
+                var obj = ObjectiveFunction.Value(v => Css(w, v.ToArray(), p, sp, q, sq, s, includeConstant, maxArLag, cancellationToken));
                 var solver = new NelderMeadSimplex(1e-10, 8000);
                 theta = solver.FindMinimum(obj, Vector<double>.Build.DenseOfArray(start)).MinimizingPoint.ToArray();
             }
         }
 
-        var resid = Residuals(w, theta, p, sp, q, sq, s, includeConstant, maxArLag);
+        var resid = Residuals(w, theta, p, sp, q, sq, s, includeConstant, maxArLag, cancellationToken);
         int nEff = m - maxArLag;
         double ss = 0;
         for (int t = maxArLag; t < m; t++) ss += resid[t] * resid[t];
@@ -70,7 +73,7 @@ public static class Sarima
         double logLik = -0.5 * nEff * (Math.Log(2 * Math.PI * sigma2) + 1);
         double aic = -2 * logLik + 2 * (nParams + 1);
 
-        var se = StdErrors(w, theta, p, sp, q, sq, s, includeConstant, maxArLag, sigma2, nParams);
+        var se = StdErrors(w, theta, p, sp, q, sq, s, includeConstant, maxArLag, sigma2, nParams, cancellationToken);
         var terms = new List<ArimaTerm>();
         var tdist = new StudentT(0, 1, Math.Max(1, nEff - nParams));
         int idx = 0;
@@ -80,7 +83,7 @@ public static class Sarima
         for (int j = 1; j <= q; j++) terms.Add(Term($"MA({j})", theta, se, ref idx, tdist));
         for (int j = 1; j <= sq; j++) terms.Add(Term($"SMA({j})", theta, se, ref idx, tdist));
 
-        var (fc, lo, hi) = Forecast(series, w, theta, p, sp, q, sq, s, includeConstant, maxArLag, resid, sigma2, stages, forecasts);
+        var (fc, lo, hi) = Forecast(series, w, theta, p, sp, q, sq, s, includeConstant, maxArLag, resid, sigma2, stages, forecasts, cancellationToken);
         return new SarimaResult(p, d, q, sp, sd, sq, s, includeConstant, terms, sigma2, logLik, aic,
             resid[maxArLag..], fc, lo, hi, series.Length);
     }
@@ -115,8 +118,9 @@ public static class Sarima
         return mm;
     }
 
-    private static double[] Residuals(double[] w, double[] theta, int p, int sp, int q, int sq, int s, bool c, int maxArLag)
+    private static double[] Residuals(double[] w, double[] theta, int p, int sp, int q, int sq, int s, bool c, int maxArLag, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         int m = w.Length;
         double cc = c ? theta[0] : 0;
         var a = ArCoefs(theta, p, sp, s, c);
@@ -124,6 +128,7 @@ public static class Sarima
         var e = new double[m];
         for (int t = maxArLag; t < m; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double pred = cc;
             for (int k = 1; k <= a.Length; k++) pred += a[k - 1] * w[t - k];
             for (int k = 1; k <= mm.Length; k++) pred += mm[k - 1] * (t - k >= maxArLag ? e[t - k] : 0);
@@ -132,17 +137,19 @@ public static class Sarima
         return e;
     }
 
-    private static double Css(double[] w, double[] theta, int p, int sp, int q, int sq, int s, bool c, int maxArLag)
+    private static double Css(double[] w, double[] theta, int p, int sp, int q, int sq, int s, bool c, int maxArLag, CancellationToken cancellationToken)
     {
-        var e = Residuals(w, theta, p, sp, q, sq, s, c, maxArLag);
+        cancellationToken.ThrowIfCancellationRequested();
+        var e = Residuals(w, theta, p, sp, q, sq, s, c, maxArLag, cancellationToken);
         double ss = 0;
         for (int t = maxArLag; t < w.Length; t++) ss += e[t] * e[t];
         return ss;
     }
 
     private static double[] StdErrors(double[] w, double[] theta, int p, int sp, int q, int sq, int s,
-        bool c, int maxArLag, double sigma2, int nParams)
+        bool c, int maxArLag, double sigma2, int nParams, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (nParams == 0) return Array.Empty<double>();
         try
         {
@@ -151,10 +158,11 @@ public static class Sarima
             double h = 1e-5;
             for (int k = 0; k < nParams; k++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var up = (double[])theta.Clone(); up[k] += h;
                 var dn = (double[])theta.Clone(); dn[k] -= h;
-                var eu = Residuals(w, up, p, sp, q, sq, s, c, maxArLag);
-                var ed = Residuals(w, dn, p, sp, q, sq, s, c, maxArLag);
+                var eu = Residuals(w, up, p, sp, q, sq, s, c, maxArLag, cancellationToken);
+                var ed = Residuals(w, dn, p, sp, q, sq, s, c, maxArLag, cancellationToken);
                 for (int t = maxArLag; t < m; t++) J[t - maxArLag, k] = (eu[t] - ed[t]) / (2 * h);
             }
             var cov = (J.TransposeThisAndMultiply(J)).Inverse() * sigma2;
@@ -162,13 +170,15 @@ public static class Sarima
             for (int k = 0; k < nParams; k++) se[k] = Math.Sqrt(Math.Max(0, cov[k, k]));
             return se;
         }
+        catch (OperationCanceledException) { throw; }
         catch { return Enumerable.Repeat(double.NaN, nParams).ToArray(); }
     }
 
     private static (double[] Fc, double[] Lo, double[] Hi) Forecast(double[] series, double[] w, double[] theta,
         int p, int sp, int q, int sq, int s, bool c, int maxArLag, double[] resid, double sigma2,
-        List<(int Lag, double[] Pre)> stages, int h)
+        List<(int Lag, double[] Pre)> stages, int h, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (h <= 0) return (Array.Empty<double>(), Array.Empty<double>(), Array.Empty<double>());
         int m = w.Length;
         double cc = c ? theta[0] : 0;
@@ -179,9 +189,10 @@ public static class Sarima
         var eExt = new double[m + h]; Array.Copy(resid, eExt, m);
         for (int t = m; t < m + h; t++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double pred = cc;
             for (int k = 1; k <= a.Length; k++) pred += a[k - 1] * wExt[t - k];
-            for (int k = 1; k <= mm.Length; k++) pred += mm[k - 1] * (t - k < m ? eExt[t - k] : 0);
+            for (int k = 1; k <= mm.Length; k++) pred += mm[k - 1] * (t - k >= maxArLag && t - k < m ? eExt[t - k] : 0);
             wExt[t] = pred; eExt[t] = 0;
         }
         var fc = new double[h];
@@ -205,7 +216,7 @@ public static class Sarima
         }
 
         // Apply inverse differencing to the innovation impulse response.
-        var impulse = Psi(a, mm, h);
+        var impulse = Psi(a, mm, h, cancellationToken);
         foreach (var stage in stages)
             for (int i = stage.Lag; i < h; i++)
                 impulse[i] += impulse[i - stage.Lag];
@@ -220,8 +231,9 @@ public static class Sarima
         return (fc, lo, hi);
     }
 
-    private static double[] Psi(double[] a, double[] mm, int h)
+    private static double[] Psi(double[] a, double[] mm, int h, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var psi = new double[h]; psi[0] = 1;
         for (int j = 1; j < h; j++)
         {
@@ -234,8 +246,9 @@ public static class Sarima
 
     // ---- helpers -----------------------------------------------------------
 
-    private static double[] Diff(double[] x, int lag)
+    private static double[] Diff(double[] x, int lag, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var r = new double[x.Length - lag];
         for (int i = 0; i < r.Length; i++) r[i] = x[i + lag] - x[i];
         return r;

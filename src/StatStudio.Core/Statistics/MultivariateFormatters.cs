@@ -31,7 +31,7 @@ public static class MultivariateFormatters
             cent.Add(new[] { (c + 1).ToString() }.Concat(r.Centroids[c].Select(v => Fmt.N(v, 3))).ToArray());
 
         return $"K-Means Cluster Analysis: {string.Join(", ", r.Variables)}\n\n" +
-               $"Number of clusters: {r.K}   (converged in {r.Iterations} iterations)\n\n" +
+               $"Number of clusters: {r.K}   ({(r.Converged ? "converged" : "iteration limit reached; not converged")} after {r.Iterations} iterations)\n\n" +
                "Cluster Summary\n" + sizes + $"\n  Total within-cluster SS = {Fmt.N(r.TotalWithinSS, 3)}\n\n" +
                "Cluster Centroids\n" + cent;
     }
@@ -53,7 +53,7 @@ public static class MultivariateFormatters
 
         var varTab = new TextTable(new[] { "" }.Concat(Enumerable.Range(1, m).Select(j => $"Factor{j}")).ToArray()).LeftAlign(0);
         varTab.Add(new[] { "Variance" }.Concat(r.VarianceExplained.Select(v => Fmt.N(v, 4))).ToArray());
-        varTab.Add(new[] { "% Var" }.Concat(r.Proportion.Select(v => Fmt.N(v, 4))).ToArray());
+        varTab.Add(new[] { "% Var" }.Concat(r.Proportion.Select(v => Fmt.N(100 * v, 4))).ToArray());
 
         return $"Factor Analysis: {string.Join(", ", r.Variables)}\n\n" +
                $"Principal-components extraction, {m} factor(s)" + (r.Rotated ? ", varimax rotation" : "") + "\n\n" +

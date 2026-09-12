@@ -32,7 +32,8 @@ public sealed class Worksheet
     public void Clear() => _columns.Clear();
 
     /// <summary>Columns whose non-missing cells are all numeric.</summary>
-    public IEnumerable<DataColumn> NumericColumns() => _columns.Where(c => c.LooksNumeric());
+    public IEnumerable<DataColumn> NumericColumns() =>
+        _columns.Where(c => c.Type == ColumnType.Numeric && c.LooksNumeric());
 
     /// <summary>The Minitab default name for the 1-based column position (C1, C2, ...).</summary>
     public static string DefaultName(int oneBasedIndex) => $"C{oneBasedIndex}";

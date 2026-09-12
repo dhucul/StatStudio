@@ -11,7 +11,7 @@ public partial class TwoColumnWindow : Window
     public double Confidence { get; private set; } = 0.95;
     public Alternative Alt { get; private set; } = Alternative.TwoSided;
 
-    public TwoColumnWindow(IReadOnlyList<string> columns, string title, bool showPooled)
+    public TwoColumnWindow(IReadOnlyList<string> columns, string title, bool showPooled, bool twoSidedOnly = false)
     {
         InitializeComponent();
         Title = title;
@@ -21,6 +21,8 @@ public partial class TwoColumnWindow : Window
         PooledBox.Visibility = showPooled ? Visibility.Visible : Visibility.Collapsed;
         AltCombo.ItemsSource = TestOptions.AltLabels;
         AltCombo.SelectedIndex = 0;
+        AltCombo.IsEnabled = !twoSidedOnly;
+        if (twoSidedOnly) AltCombo.ToolTip = "This test currently supports the two-sided alternative.";
     }
 
     private void OnOk(object sender, RoutedEventArgs e)

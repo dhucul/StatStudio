@@ -9,7 +9,7 @@ public partial class ArimaWindow : Window
     public int D { get; private set; }
     public int Q { get; private set; }
     public int Forecasts { get; private set; } = 6;
-    public bool IncludeConstant => ConstBox.IsChecked == true;
+    public bool IncludeConstant { get; private set; } = true;
 
     public ArimaWindow(IReadOnlyList<string> numeric)
     {
@@ -24,8 +24,9 @@ public partial class ArimaWindow : Window
         if (!TestOptions.ParseInt(PBox.Text, out var p) || p < 0 || p > 5) { Warn("p must be 0–5."); return; }
         if (!TestOptions.ParseInt(DBox.Text, out var d) || d < 0 || d > 2) { Warn("d must be 0–2."); return; }
         if (!TestOptions.ParseInt(QBox.Text, out var q) || q < 0 || q > 5) { Warn("q must be 0–5."); return; }
+        IncludeConstant = ConstBox.IsChecked == true;
         if (p == 0 && q == 0 && !IncludeConstant && d == 0) { Warn("Specify at least one term."); return; }
-        if (!TestOptions.ParseInt(ForecastBox.Text, out var f) || f < 0) { Warn("Forecast count must be nonnegative."); return; }
+        if (!TestOptions.ParseInt(ForecastBox.Text, out var f) || f < 0 || f > 10000) { Warn("Forecast count must be between 0 and 10000."); return; }
         P = p; D = d; Q = q; Forecasts = f;
         DialogResult = true;
     }

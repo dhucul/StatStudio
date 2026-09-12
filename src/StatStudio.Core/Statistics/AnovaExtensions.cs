@@ -79,18 +79,20 @@ public static class AnovaExtensions
     }
 
     /// <summary>Tukey HSD (Tukey-Kramer) all-pairwise comparisons for a one-way layout.</summary>
-    public static TukeyResult Tukey(IReadOnlyList<(string Name, double[] Values)> groups, double conf = 0.95)
+    public static TukeyResult Tukey(IReadOnlyList<(string Name, double[] Values)> groups, double conf = 0.95, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var anova = Anova.OneWay(groups);
         int k = anova.Groups.Count;
         double mse = anova.MsError;
         int dfError = anova.DfError;
-        double qCrit = StudentizedRange.InverseCDF(conf, k, dfError);
+        double qCrit = StudentizedRange.InverseCDF(conf, k, dfError, cancellationToken);
 
         var comps = new List<TukeyComparison>();
         for (int i = 0; i < k; i++)
             for (int j = i + 1; j < k; j++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var gi = anova.Groups[i];
                 var gj = anova.Groups[j];
                 double diff = gi.Mean - gj.Mean;

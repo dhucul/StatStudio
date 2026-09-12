@@ -168,7 +168,7 @@ public static class SampleData
             cem.Add(p[0]); wat.Add(p[1]); agg.Add(p[2]);
             str.Add(50 * p[0] + 25 * p[1] + 40 * p[2] + 30 * p[0] * p[2] + Gauss(rnd) * 0.8);
         }
-        Num(ws, "Cement", cem, 4); Num(ws, "Water", wat, 4); Num(ws, "Aggregate", agg, 4); Num(ws, "Strength", str, 2);
+        Exact(ws, "Cement", cem); Exact(ws, "Water", wat); Exact(ws, "Aggregate", agg); Num(ws, "Strength", str, 2);
         return ws;
     }
 
@@ -198,6 +198,12 @@ public static class SampleData
         string fmt = "F" + dp;
         foreach (var v in values) c.Add(v.ToString(fmt, Inv));
         c.Type = ColumnType.Numeric;
+    }
+
+    private static void Exact(Worksheet ws, string name, IEnumerable<double> values)
+    {
+        var c = ws.AddColumn(name);
+        foreach (var value in values) c.Add(value.ToString("R", Inv));
     }
 
     private static void Txt(Worksheet ws, string name, IEnumerable<string> values)

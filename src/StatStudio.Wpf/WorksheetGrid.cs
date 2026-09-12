@@ -11,8 +11,12 @@ namespace StatStudio.Wpf;
 /// </summary>
 internal static class WorksheetGrid
 {
+    private const string DeclaredTypeKey = "StatStudio.ColumnType";
     public static DataTable ToDataTable(CoreData.Worksheet ws)
     {
+        if (ws.ColumnCount > StatStudio.Core.Statistics.AnalysisLimits.MaxWorksheetColumns ||
+            (long)ws.RowCount * ws.ColumnCount > StatStudio.Core.Statistics.AnalysisLimits.MaxWorksheetCells)
+            throw new ArgumentException("Worksheets are limited to 512 columns and 2,000,000 cells.");
         var table = new DataTable(ws.Name);
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var col in ws.Columns)
@@ -23,6 +27,7 @@ internal static class WorksheetGrid
             while (!used.Add(name)) name = $"{baseName}_{n++}";
             var dc = table.Columns.Add(name, typeof(string));
             dc.Caption = name;
+            dc.ExtendedProperties[DeclaredTypeKey] = col.Type;
         }
 
         int rows = ws.RowCount;
@@ -67,7 +72,9 @@ internal static class WorksheetGrid
                 var v = rows[r][dc];
                 col.Add(v == DBNull.Value ? null : v?.ToString());
             }
-            col.Type = col.LooksNumeric() ? CoreData.ColumnType.Numeric : CoreData.ColumnType.Text;
+            col.Type = dc.ExtendedProperties[DeclaredTypeKey] is CoreData.ColumnType declared
+                ? declared
+                : col.LooksNumeric() ? CoreData.ColumnType.Numeric : CoreData.ColumnType.Text;
         }
         return ws;
     }

@@ -136,7 +136,7 @@ public static class HypothesisTests
         RequireCount(x2, n2, nameof(x2));
         StatGuard.Probability(conf, nameof(conf));
         double p1 = (double)x1 / n1, p2 = (double)x2 / n2, diff = p1 - p2;
-        double pPool = (double)(x1 + x2) / (n1 + n2);
+        double pPool = ((double)x1 + x2) / ((double)n1 + n2);
         double seTest = Math.Sqrt(pPool * (1 - pPool) * (1.0 / n1 + 1.0 / n2));
         double z = seTest > 0 ? diff / seTest : double.NaN;
         double p = PFromZ(z, alt);

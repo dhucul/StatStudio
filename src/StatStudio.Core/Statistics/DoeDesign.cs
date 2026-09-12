@@ -30,6 +30,8 @@ public static class DoeDesign
         if (centerPoints < 0) throw new ArgumentOutOfRangeException(nameof(centerPoints));
 
         int baseRuns = 1 << k;
+        if (((long)baseRuns + centerPoints) * replicates > AnalysisLimits.MaxDesignRuns)
+            throw new ArgumentOutOfRangeException(nameof(replicates), "Designs are limited to 10000 runs.");
         var corner = new List<double[]>(baseRuns);
         for (int mask = 0; mask < baseRuns; mask++)
         {

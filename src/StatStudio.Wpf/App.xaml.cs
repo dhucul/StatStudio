@@ -26,9 +26,10 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        if (e.Exception is OperationCanceledException) { e.Handled = true; return; }
         TryLog(e.Exception);
         MessageBox.Show(
-            $"{e.Exception.Message}\n\nThe worksheet is unchanged — you can keep working or save it.",
+            $"{e.Exception.Message}\n\nReview the worksheet before continuing or saving your work.",
             "StatStudio — unexpected error",
             MessageBoxButton.OK,
             MessageBoxImage.Error);

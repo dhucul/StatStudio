@@ -6,15 +6,17 @@ namespace StatStudio.Wpf.Dialogs;
 public partial class ColumnPickerWindow : Window
 {
     private readonly List<CheckBox> _boxes = new();
+    private readonly bool _singleSelection;
 
     public List<string> SelectedColumns { get; } = new();
 
     public ColumnPickerWindow(string title, string prompt, IEnumerable<string> columns,
-        IEnumerable<string>? preselect = null)
+        IEnumerable<string>? preselect = null, bool singleSelection = false)
     {
         InitializeComponent();
         Title = title;
         Prompt.Text = prompt;
+        _singleSelection = singleSelection;
 
         var pre = new HashSet<string>(preselect ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
         foreach (var c in columns)
@@ -31,9 +33,9 @@ public partial class ColumnPickerWindow : Window
         foreach (var cb in _boxes)
             if (cb.IsChecked == true) SelectedColumns.Add((string)cb.Content);
 
-        if (SelectedColumns.Count == 0)
+        if (SelectedColumns.Count == 0 || (_singleSelection && SelectedColumns.Count != 1))
         {
-            MessageBox.Show("Select at least one column.", Title,
+            MessageBox.Show(_singleSelection ? "Select exactly one column." : "Select at least one column.", Title,
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }

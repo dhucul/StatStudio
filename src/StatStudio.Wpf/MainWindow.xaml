@@ -5,7 +5,7 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}">
     <DockPanel>
-        <Menu DockPanel.Dock="Top">
+        <Menu x:Name="MainMenu" DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="_New Worksheet" Click="OnNewWorksheet"/>
                 <MenuItem Header="_Open Data (CSV / Excel)…" Click="OnOpenCsv"/>
@@ -135,6 +135,7 @@
         </Menu>
 
         <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem><Button x:Name="CancelWorkButton" Content="Cancel operation" Click="OnCancelWork" Visibility="Collapsed"/></StatusBarItem>
             <StatusBarItem><TextBlock x:Name="StatusText" Text="Ready" Foreground="White"/></StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
                 <TextBlock x:Name="DimsText" Text="" Foreground="White"/>
@@ -152,8 +153,7 @@
             <DockPanel Grid.Column="0" Background="{DynamicResource Panel}">
                 <TextBlock DockPanel.Dock="Top" Text="Navigator" Margin="8,6"
                            Foreground="{DynamicResource AccentLight}" FontWeight="SemiBold"/>
-                <ListBox x:Name="NavList" BorderThickness="0" Background="{DynamicResource Panel}"
-                         MouseDoubleClick="OnNavDoubleClick"/>
+                <ListBox x:Name="NavList" BorderThickness="0" Background="{DynamicResource Panel}"/>
             </DockPanel>
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
@@ -183,7 +183,7 @@
                 <DockPanel Grid.Row="2">
                     <TextBlock x:Name="WorksheetHeader" DockPanel.Dock="Top" Text="Worksheet"
                                Margin="8,6" Foreground="{DynamicResource AccentLight}" FontWeight="SemiBold"/>
-                    <DataGrid x:Name="Sheet" AutoGenerateColumns="True" CanUserAddRows="True"
+                    <DataGrid x:Name="Sheet" AutoGenerateColumns="True" CanUserAddRows="True" CanUserSortColumns="False"
                               CanUserDeleteRows="True" HeadersVisibility="All"
                               SelectionUnit="CellOrRowHeader" BorderThickness="0"
                               AutoGeneratingColumn="OnGridAutoGeneratingColumn"/>

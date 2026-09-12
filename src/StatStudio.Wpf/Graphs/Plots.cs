@@ -80,6 +80,13 @@ internal static class Plots
             double lo = q1 - 1.5 * iqr, hi = q3 + 1.5 * iqr;
             double wMin = sorted.First(v => v >= lo);
             double wMax = sorted.Last(v => v <= hi);
+            var outliers = sorted.Where(v => v < lo || v > hi).ToArray();
+            if (outliers.Length > 0)
+            {
+                var points = p.Add.ScatterPoints(Enumerable.Repeat((double)i, outliers.Length).ToArray(), outliers);
+                points.Color = Palette[i % Palette.Length];
+                points.MarkerSize = 6;
+            }
 
             boxes.Add(new Box
             {

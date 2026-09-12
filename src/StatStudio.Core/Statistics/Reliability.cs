@@ -44,8 +44,9 @@ public static class Reliability
     /// Exponential MLE. With right-censoring the estimator is the total time on test divided by
     /// the number of failures — censored units contribute their run time but not a failure.
     /// </summary>
-    public static DistributionFit FitExponential(double[] t, bool[]? censored = null, double conf = 0.95)
+    public static DistributionFit FitExponential(double[] t, bool[]? censored = null, double conf = 0.95, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var c = RequireLifeData(t, censored, positive: true, minimumFailures: 1);
         StatGuard.Probability(conf, nameof(conf));
         double mean = t.Sum() / c.Failures;
@@ -78,8 +79,9 @@ public static class Reliability
     /// that long) but not the failure count or the Σln t term, which is exactly what separates the
     /// censored likelihood from the complete-data one.
     /// </summary>
-    public static DistributionFit FitWeibull(double[] t, bool[]? censored = null, double conf = 0.95)
+    public static DistributionFit FitWeibull(double[] t, bool[]? censored = null, double conf = 0.95, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var c = RequireLifeData(t, censored, positive: true, minimumFailures: 2);
         StatGuard.Probability(conf, nameof(conf));
         int n = t.Length;
@@ -100,9 +102,11 @@ public static class Reliability
 
         double Shape(double b)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double sw = 0, swl = 0;
             for (int i = 0; i < n; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 double w = Math.Pow(z[i], b);   // every unit contributes, censored or not
                 sw += w;
                 swl += w * Math.Log(z[i]);
@@ -148,12 +152,13 @@ public static class Reliability
             meanC, sdC, medianC, pct, n, r, c.Censored, conf);
     }
 
-    public static DistributionFit FitLognormal(double[] t, bool[]? censored = null, double conf = 0.95)
+    public static DistributionFit FitLognormal(double[] t, bool[]? censored = null, double conf = 0.95, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var c = RequireLifeData(t, censored, positive: true, minimumFailures: 2);
         StatGuard.Probability(conf, nameof(conf));
         var logs = t.Select(x => Math.Log(x)).ToArray();
-        var (mu, sigma) = GaussianMle(logs, c);
+        var (mu, sigma) = GaussianMle(logs, c, cancellationToken);
 
         var theta = new[] { mu, sigma };
         // μ is a log-scale location and may be any sign, so its interval stays symmetric.
@@ -179,11 +184,12 @@ public static class Reliability
             meanC, sdC, medianC, pct, t.Length, c.Failures, c.Censored, conf);
     }
 
-    public static DistributionFit FitNormal(double[] t, bool[]? censored = null, double conf = 0.95)
+    public static DistributionFit FitNormal(double[] t, bool[]? censored = null, double conf = 0.95, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var c = RequireLifeData(t, censored, positive: true, minimumFailures: 2);
         StatGuard.Probability(conf, nameof(conf));
-        var (mu, sigma) = GaussianMle(t, c);
+        var (mu, sigma) = GaussianMle(t, c, cancellationToken);
 
         var theta = new[] { mu, sigma };
         var (se, low, high, cov) = Uncertainty(v => GaussianLogLikelihood(v, t, c), theta,
@@ -219,8 +225,9 @@ public static class Reliability
     /// has no closed-form maximiser, so it is minimised numerically. σ is optimised as ln σ to keep
     /// it positive without a constraint, and the complete-data estimates seed the search.
     /// </remarks>
-    private static (double Mu, double Sigma) GaussianMle(double[] x, Censoring c)
+    private static (double Mu, double Sigma) GaussianMle(double[] x, Censoring c, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         double mu0 = x.Average();
         double sigma0 = Math.Sqrt(x.Average(v => (v - mu0) * (v - mu0)));
         if (sigma0 <= 0)
@@ -233,6 +240,7 @@ public static class Reliability
             double total = 0;
             for (int i = 0; i < x.Length; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 double zi = (x[i] - mu) / sigma;
                 if (c.IsCensored[i])
                 {
@@ -268,8 +276,9 @@ public static class Reliability
     }
 
     /// <summary>Kaplan-Meier survival estimate. <paramref name="censored"/>[i] = true means right-censored.</summary>
-    public static KaplanMeierResult KaplanMeier(double[] times, bool[] censored)
+    public static KaplanMeierResult KaplanMeier(double[] times, bool[] censored, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(times);
         ArgumentNullException.ThrowIfNull(censored);
         if (times.Length == 0)
@@ -293,10 +302,12 @@ public static class Reliability
         int index = 0;
         while (index < observations.Length)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             double time = observations[index].First;
             int fails = 0, cens = 0;
             while (index < observations.Length && observations[index].First == time)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (observations[index].Second) cens++;
                 else fails++;
                 index++;

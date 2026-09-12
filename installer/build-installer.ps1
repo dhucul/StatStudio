@@ -25,6 +25,9 @@ try
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 
     $candidates = @(
+        "$env:LOCALAPPDATA\Programs\Inno Setup 7\ISCC.exe",
+        "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 7\ISCC.exe",
         "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
         "$env:ProgramFiles\Inno Setup 6\ISCC.exe"

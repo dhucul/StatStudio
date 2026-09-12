@@ -26,8 +26,10 @@ public static class ProjectStore
         Converters = { new JsonStringEnumConverter() },
     };
 
-    public static void Save(Worksheet ws, string path)
+    public static void Save(Worksheet ws, string path, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        WorksheetIo.RequireDimensions(ws.RowCount, ws.ColumnCount);
         var dto = new ProjectDto { Name = ws.Name };
         foreach (var c in ws.Columns)
             dto.Columns.Add(new ColumnDto { Name = c.Name, Type = c.Type, Cells = c.Cells.ToList() });
@@ -38,6 +40,7 @@ public static class ProjectStore
             // which doubles peak memory and lands a large worksheet on the LOH.
             using (var stream = File.Create(temporaryPath))
                 JsonSerializer.Serialize(stream, dto, Options);
+            cancellationToken.ThrowIfCancellationRequested();
             AtomicFile.Commit(temporaryPath, path);
         }
         finally
@@ -46,8 +49,10 @@ public static class ProjectStore
         }
     }
 
-    public static Worksheet Load(string path)
+    public static Worksheet Load(string path, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        WorksheetIo.RequireFileSize(path);
         var dto = JsonSerializer.Deserialize<ProjectDto>(File.ReadAllText(path), Options)
                   ?? throw new InvalidDataException("Project root cannot be null.");
         if (string.IsNullOrWhiteSpace(dto.Name))
@@ -58,8 +63,10 @@ public static class ProjectStore
         var ws = new Worksheet { Name = dto.Name };
         foreach (var cd in dto.Columns)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (cd is null || string.IsNullOrWhiteSpace(cd.Name) || cd.Cells is null)
                 throw new InvalidDataException("Project contains an invalid column.");
+            WorksheetIo.RequireDimensions(cd.Cells.Count, dto.Columns.Count);
             var col = ws.AddColumn(cd.Name, cd.Type);
             foreach (var v in cd.Cells) col.Add(v);
         }
